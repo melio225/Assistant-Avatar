@@ -339,7 +339,7 @@ loader.load(
         // Greet once loaded and voices are ready
         whenVoicesReady(() => {
             setTimeout(() => {
-                triggerWelcomeGesture()
+                triggerBowGesture()
                 speak("Hello, how can I assist you today? I'm the virtual assistant for EAH Jena.")
             }, 800)
         })
@@ -352,18 +352,22 @@ loader.load(
 
 
 // ======================
-// Idle pose (fixes the default T-pose)
+// Idle pose — hands clasped in front ("Japanese welcome" stance)
 // ======================
 //
-// This rig's bind pose is a T-pose too, same issue as before — but
-// unlike VRM, there's no "normalized" bone space here, so the correct
-// axis/sign to lower the arms is specific to THIS rig. rotation.z is
-// the most common convention for Mixamo/RPM-style rigs and is the best
-// first guess, but if the arms don't move — or move the wrong way —
-// open your browser console and try:
-//   currentAvatarRoot.getObjectByName('LeftArm').rotation.x = 1
-// (swap .x for .y or .z, and try positive/negative) until you find the
-// axis that lowers the arm, then update the values below to match.
+// This replaces the old arms-at-sides resting pose. Instead, the avatar
+// now rests with hands together in front of the body — the pose she
+// stays in permanently, both before and after the bow gesture.
+//
+// IMPORTANT — the values below are an educated first guess, not tuned
+// values like the old arms-at-sides pose was. They're built from what
+// your tuning already taught us about this rig (upper arm rotation.x
+// lowers the arm to the side, rotation.z swings it forward/inward —
+// that's what caused the "zombie" arms earlier, and it's exactly what
+// we need now to bring the hands to the front). But a full two-handed
+// clasped pose is more complex than a single arm, so expect to need the
+// tuner (press P, keys 1-6) to get hands actually meeting/overlapping
+// rather than just close.
 
 // Filled in by setIdlePose, read every frame by applyIdleSway / applyGesture
 let idleBones = {}
@@ -381,22 +385,24 @@ function setIdlePose(root) {
         leftIndexProximal: root.getObjectByName('LeftHandIndex1'),
         rightIndexProximal: root.getObjectByName('RightHandIndex1'),
         leftMiddleProximal: root.getObjectByName('LeftHandMiddle1'),
-        rightMiddleProximal: root.getObjectByName('RightHandMiddle1')
+        rightMiddleProximal: root.getObjectByName('RightHandMiddle1'),
+        // Spine — used for the bow gesture, not part of the arm pose
+        spine: root.getObjectByName('Spine')
     }
 
-    // Bring upper arms down from horizontal (T-pose) toward the sides.
-    // All four values below were found live via the pose tuner (press P)
-    // — this is the actual working rest pose for THIS rig, not a guess.
-    if (bones.leftUpperArm) bones.leftUpperArm.rotation.set(1.55, -0.01, -0.02)
-    if (bones.rightUpperArm) bones.rightUpperArm.rotation.set(1.51, 0.01, 0.05)
+    // Upper arms and forearms: all four values below were found live via
+    // the pose tuner (press P) — actual working values for THIS rig's
+    // hands-together pose, not a guess.
+    if (bones.leftUpperArm) bones.leftUpperArm.rotation.set(1.25, 1.10, -0.20)
+    if (bones.rightUpperArm) bones.rightUpperArm.rotation.set(1.40, -0.85, 0.15)
 
-    // Slight bend at the elbow so it doesn't look robotic — also tuned live
-    if (bones.leftLowerArm) bones.leftLowerArm.rotation.set(-0.10, -0.14, 0.20)
-    if (bones.rightLowerArm) bones.rightLowerArm.rotation.set(-0.05, 0.12, -0.35)
+    if (bones.leftLowerArm) bones.leftLowerArm.rotation.set(0.00, -0.40, 1.60)
+    if (bones.rightLowerArm) bones.rightLowerArm.rotation.set(-0.05, 0.30, -1.50)
 
-    // Relax the hands slightly too
-    if (bones.leftHand) bones.leftHand.rotation.z = 0.05
-    if (bones.rightHand) bones.rightHand.rotation.z = -0.05
+    // Hands: left starts flat, right resting on top — still needs tuning
+    // (key 5 = rightHand, key 6 = leftHand)
+    if (bones.leftHand) bones.leftHand.rotation.set(0, 0, 0.1)
+    if (bones.rightHand) bones.rightHand.rotation.set(0, 0, -0.1)
 
     idleBones = bones
     window.idleBones = bones // handy for manual console testing, e.g. idleBones.rightHand.rotation.z = 1
@@ -415,38 +421,34 @@ function setIdlePose(root) {
 // Idle sway ("körperlich" — a little physical presence)
 // ======================
 //
-// Small, slow, out-of-phase sine offsets on the arms/hands/fingers so the
-// avatar doesn't look frozen between blinks. Amplitudes are deliberately
-// tiny (a few degrees) — the goal is "breathing/alive," not "gesturing."
+// Small, slow sine offsets so the avatar doesn't look frozen between
+// blinks. With hands clasped together, left/right now move IN PHASE
+// (same sign, same timing) rather than opposite — swaying them
+// out-of-phase like before would make the hands visibly drift apart
+// during idle, which looks broken for a clasped-hands pose. Amplitude
+// is also lower than the old arms-at-sides version for the same reason.
 
 function applyIdleSway(elapsed) {
     const b = idleBones
     const base = idleBase
 
+    const armSway = Math.sin(elapsed * 0.5) * 0.012
+
     if (b.leftUpperArm && base.leftUpperArm) {
-        b.leftUpperArm.rotation.z = base.leftUpperArm.z + Math.sin(elapsed * 0.6) * 0.025
-        b.leftUpperArm.rotation.x = base.leftUpperArm.x + Math.sin(elapsed * 0.4 + 1.3) * 0.02
+        b.leftUpperArm.rotation.z = base.leftUpperArm.z + armSway
     }
     if (b.rightUpperArm && base.rightUpperArm) {
-        b.rightUpperArm.rotation.z = base.rightUpperArm.z + Math.sin(elapsed * 0.55 + 2) * 0.025
-        b.rightUpperArm.rotation.x = base.rightUpperArm.x + Math.sin(elapsed * 0.45 + 0.7) * 0.02
+        b.rightUpperArm.rotation.z = base.rightUpperArm.z + armSway
     }
     if (b.leftLowerArm && base.leftLowerArm) {
-        b.leftLowerArm.rotation.y = base.leftLowerArm.y + Math.sin(elapsed * 0.5 + 0.5) * 0.03
+        b.leftLowerArm.rotation.y = base.leftLowerArm.y + armSway
     }
     if (b.rightLowerArm && base.rightLowerArm) {
-        b.rightLowerArm.rotation.y = base.rightLowerArm.y + Math.sin(elapsed * 0.52 + 1.8) * 0.03
-    }
-    if (b.leftHand && base.leftHand) {
-        b.leftHand.rotation.z = base.leftHand.z + Math.sin(elapsed * 0.8 + 1) * 0.05
-        b.leftHand.rotation.x = Math.sin(elapsed * 0.35) * 0.04
-    }
-    if (b.rightHand && base.rightHand) {
-        b.rightHand.rotation.z = base.rightHand.z + Math.sin(elapsed * 0.75 + 2.2) * 0.05
-        b.rightHand.rotation.x = Math.sin(elapsed * 0.38 + 1) * 0.04
+        b.rightLowerArm.rotation.y = base.rightLowerArm.y + armSway
     }
 
-    // Fingers — a very subtle curl drift
+    // Fingers — a very subtle curl drift (fine to leave out-of-phase,
+    // doesn't affect whether the hands stay together)
     if (b.leftIndexProximal) b.leftIndexProximal.rotation.x = 0.05 + Math.sin(elapsed * 0.7) * 0.03
     if (b.rightIndexProximal) b.rightIndexProximal.rotation.x = 0.05 + Math.sin(elapsed * 0.72 + 2.4) * 0.03
     if (b.leftMiddleProximal) b.leftMiddleProximal.rotation.x = 0.05 + Math.sin(elapsed * 0.65 + 1) * 0.03
@@ -455,21 +457,24 @@ function applyIdleSway(elapsed) {
 
 
 // ======================
-// One-off gestures ("hi from far away" wave on greeting)
+// One-off gestures (Japanese-style welcome bow)
 // ======================
 //
 // Runs on top of idle sway for a fixed duration, then hands control back.
-// A big ~180° swing of the forearm (rotation.z on rightLowerArm — the
-// axis your tuning showed carries the elbow bend on this rig) plus a
-// side-to-side wag at the wrist once it's up. Deliberately NOT a forward
-// reach — the upper arm never moves, so it doesn't read as a handshake.
-// If the arm swings the wrong way, flip the sign on `Math.PI` below.
+// Only the spine bends forward and back — the arms/hands stay exactly
+// where they are in the clasped resting pose the whole time, which is
+// what makes it read as a bow rather than a wave.
+//
+// rotation.x is the standard convention for forward/backward spine bend
+// on almost every humanoid rig — best first guess, but if she leans
+// sideways or twists instead of bending forward, use the tuner (press P,
+// key 7) to find the right axis on THIS bone.
 
 let activeGesture = null // { type, startTime, duration }
 
-function triggerWelcomeGesture() {
-    if (!idleBones.rightLowerArm) return
-    activeGesture = { type: 'welcome', startTime: clock.getElapsedTime(), duration: 2.8 }
+function triggerBowGesture() {
+    if (!idleBones.spine) return
+    activeGesture = { type: 'bow', startTime: clock.getElapsedTime(), duration: 2.2 }
 }
 
 function applyActiveGesture() {
@@ -482,7 +487,7 @@ function applyActiveGesture() {
         return
     }
 
-    if (activeGesture.type === 'welcome') {
+    if (activeGesture.type === 'bow') {
         const b = idleBones
         const base = idleBase
 
@@ -490,7 +495,7 @@ function applyActiveGesture() {
         // returns to exactly 0 by the time the gesture ends, so the
         // handoff back to idle sway is seamless instead of a jump-cut.
         const riseTime = 0.7
-        const fallTime = 0.6
+        const fallTime = 0.7
         const fallStart = activeGesture.duration - fallTime
 
         let lift
@@ -501,27 +506,14 @@ function applyActiveGesture() {
         } else {
             lift = Math.max(0, (activeGesture.duration - t) / fallTime)
         }
-        // Ease (smoothstep) instead of linear, so the swing itself feels
-        // less mechanical
+        // Ease (smoothstep) instead of linear, so the bow feels less
+        // mechanical — a real bow doesn't move at constant speed
         const eased = lift * lift * (3 - 2 * lift)
 
-        if (b.rightLowerArm && base.rightLowerArm) {
-            // ~130° swing (130° × π/180 ≈ 2.27 rad) — big enough to read
-            // from across a room, without the full 180° being too much
-            b.rightLowerArm.rotation.z = base.rightLowerArm.z - eased * 2.27
-        }
-
-        // Rotate the palm to face the camera (not sideways) once raised,
-        // plus a side-to-side wag at the wrist — the actual "waving"
-        // motion, layered on top of the raise. rotation.y is the best
-        // guess for the hand's roll/twist axis — if the palm still
-        // doesn't face forward, try flipping the sign, or swap .y for .x
-        // and test live via: window.idleBones.rightHand.rotation.y = 1.4
-        if (b.rightHand && base.rightHand) {
-            const wag = Math.sin(t * 6) * 0.4 
-            const palmFacing = eased * -1.4 
-            b.rightHand.rotation.z = base.rightHand.z + wag 
-            b.rightHand.rotation.y = base.rightHand.y + palmFacing
+        if (b.spine && base.spine) {
+            // A polite ~20° bow (0.35 rad) — modest, not a deep formal
+            // bow. Increase toward ~0.5-0.6 for a deeper one.
+            b.spine.rotation.x = base.spine.x + eased * 0.35
         }
     }
 }
@@ -554,19 +546,26 @@ function setMorph(meshes, name, value) {
 // rotation values interactively instead of me guessing axes blindly.
 //
 //   P              toggle the tuner panel on/off (also freezes idle sway
-//                  so your edits aren't overwritten every frame)
-//   1 / 2 / 3 / 4 / 5   select: left upper arm / right upper arm /
-//                       left forearm / right forearm / right hand
+//                  AND freezes any in-progress bow gesture, so your
+//                  edits aren't overwritten every frame)
+//   1-7            select: left upper arm / right upper arm / left
+//                  forearm / right forearm / right hand / left hand /
+//                  spine (for the bow)
 //   Arrow Left/Right   adjust Z rotation
 //   Arrow Up/Down      adjust X rotation
 //   Shift + Up/Down    adjust Y rotation
 //   R              reset selected bone to its original bind rotation
 //
-// For the hand specifically: select it with 5, then rotate it until the
-// palm faces the camera the way you want at full wave height. Send me
-// that rotation.set(...) line and I'll use it as the gesture's PEAK
-// value (not a resting pose) — the wave will ease from resting up to
-// exactly that rotation, then back down.
+// For the hands-together pose specifically: the current values in
+// setIdlePose are an educated guess, not tuned. Use 1/2/3/4/5/6 to bring
+// the hands actually together (they'll likely be close but not
+// overlapping at first). For the bow, reload the page, and right as she
+// starts bowing press P — this freezes mid-bow so you can select 7 and
+// find the correct forward-bend axis/sign for the spine.
+//
+// Once everything looks right, send me all the rotation.set(...) lines
+// together and I'll bake them into setIdlePose (for 1-6) and the bow
+// gesture (for 7) in one pass.
 
 let tunerActive = false
 let tunerSelection = 'leftUpperArm'
@@ -577,7 +576,9 @@ const TUNER_BONES = {
     '2': 'rightUpperArm',
     '3': 'leftLowerArm',
     '4': 'rightLowerArm',
-    '5': 'rightHand'
+    '5': 'rightHand',
+    '6': 'leftHand',
+    '7': 'spine'
 }
 
 function buildTunerPanel() {

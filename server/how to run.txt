@@ -1,0 +1,4 @@
+#this is how to run Backend:
+1- npm install express cors @google/generative-ai dotenv
+2- node server-gemini.js
+
