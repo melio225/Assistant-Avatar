@@ -9,10 +9,10 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 // Your project already has this at src/assets/EAH_Logo.png
 import eahLogoUrl from './assets/EAH_Logo.png'
 
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 
 // ======================
 // EAH Jena Knowledge Base
-// (Edit / expand this freely — this is what the avatar "knows")
 // ======================
 
 const KNOWLEDGE_BASE = [
@@ -60,19 +60,12 @@ function findAnswer(question) {
 }
 
 // ======================
-// Backend-powered answers (Claude API via your own server)
+// Backend Endpoints
 // ======================
-//
-// NEVER call api.anthropic.com directly from this file — your API key would
-// be visible to anyone who opens dev tools. Instead this hits a small local
-// backend (see server.js) that holds the key and proxies the request.
-//
-// If the backend is unreachable (not running, no internet, etc.) this falls
-// back to the local keyword FAQ so the demo still works offline.
 
 const CHAT_ENDPOINT = "http://localhost:3001/api/chat"
+const TTS_ENDPOINT = "http://localhost:3001/api/tts"
 
-// Keep a short running history so the assistant has conversational context
 let conversationHistory = []
 
 async function getAnswer(question) {
@@ -93,7 +86,6 @@ async function getAnswer(question) {
         conversationHistory.push({ role: "user", content: question })
         conversationHistory.push({ role: "assistant", content: data.answer })
 
-        // Keep history short so requests don't balloon
         if (conversationHistory.length > 10) {
             conversationHistory = conversationHistory.slice(-10)
         }
@@ -110,16 +102,6 @@ async function getAnswer(question) {
 // ======================
 // Scene background
 // ======================
-//
-// A flat color reads flat. This paints a soft vertical gradient onto a
-// canvas and uses it as the scene background — same brand teal as the
-// EAH Jena logo, sampled directly at #009898, so the 3D scene and the
-// chat interface feel like one design instead of two things bolted
-// together.
-//
-// Swap this out for a real environment map (HDRI) or a campus photo later
-// if you want a literal setting — see the comment at the bottom of this
-// function for how.
 
 function createGradientBackground() {
     const canvas = document.createElement("canvas")
@@ -129,10 +111,10 @@ function createGradientBackground() {
     const ctx = canvas.getContext("2d")
     const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height)
 
-    // Top: brand teal haze -> bottom: light paper tone (matches --paper-100)
-    gradient.addColorStop(0, "#007373")
-    gradient.addColorStop(0.45, "#a9d6d6")
-    gradient.addColorStop(1, "#f5f7f7")
+    // Richer EAH Jena teal gradient (less stark white)
+    gradient.addColorStop(0, "#004d4d")     // Deep teal at top
+    gradient.addColorStop(0.5, "#007373")   // Mid teal
+    gradient.addColorStop(1, "#a9d6d6")     // Soft muted teal at bottom (instead of pure white)
 
     ctx.fillStyle = gradient
     ctx.fillRect(0, 0, canvas.width, canvas.height)
@@ -141,29 +123,18 @@ function createGradientBackground() {
     texture.colorSpace = THREE.SRGBColorSpace
 
     return texture
-
-    // To use a real photo of the EAH Jena campus instead, drop an image in
-    // /public and replace this whole function's body with:
-    //   return new THREE.TextureLoader().load('/campus-background.jpg')
 }
 
-
-// ======================
-// Scene
-// ======================
-
 const scene = new THREE.Scene()
-
 scene.background = createGradientBackground()
 
-// Soft shadow-catcher plane so the avatar feels grounded rather than floating
 const ground = new THREE.Mesh(
     new THREE.CircleGeometry(2.2, 64),
     new THREE.MeshStandardMaterial({
-        color: 0xffffff,
+        color: 0x003333, // Darker teal ground tint
         transparent: true,
-        opacity: 0.35,
-        roughness: 1
+        opacity: 0.25,
+        roughness: 0.8
     })
 )
 ground.rotation.x = -Math.PI / 2
@@ -172,7 +143,7 @@ scene.add(ground)
 
 
 // ======================
-// Loading overlay + university badge (DOM chrome)
+// DOM UI Elements
 // ======================
 
 function buildLoadingOverlay() {
@@ -236,7 +207,7 @@ buildVignette()
 
 
 // ======================
-// Camera
+// Camera & Renderer
 // ======================
 
 const camera = new THREE.PerspectiveCamera(
@@ -245,26 +216,13 @@ const camera = new THREE.PerspectiveCamera(
     0.1,
     1000
 )
-
 camera.position.set(0, 1.4, 3)
 
-
-// ======================
-// Renderer
-// ======================
-
 const renderer = new THREE.WebGLRenderer({ antialias: true })
-
 renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.setPixelRatio(window.devicePixelRatio)
 renderer.outputColorSpace = THREE.SRGBColorSpace
-
 document.body.appendChild(renderer.domElement)
-
-
-// ======================
-// Controls
-// ======================
 
 const controls = new OrbitControls(camera, renderer.domElement)
 controls.target.set(0, 1.2, 0)
@@ -278,24 +236,12 @@ controls.update()
 const directionalLight = new THREE.DirectionalLight(0xffffff, 3)
 directionalLight.position.set(1, 2, 3)
 scene.add(directionalLight)
-
 scene.add(new THREE.AmbientLight(0xffffff, 1))
 
 
 // ======================
-// Avatar loading (plain glTF — no VRM plugin)
+// Avatar Loading
 // ======================
-//
-// This model (avatar_3.glb) is NOT a VRM file, so there's no humanoid/
-// expressionManager API to lean on. Instead:
-//  - Bones are looked up directly by name from the skeleton (Mixamo/
-//    Ready-Player-Me-style naming: LeftArm, RightForeArm, etc.)
-//  - Facial animation runs through real ARKit-style morph targets
-//    (eyeBlinkLeft, jawOpen, mouthSmileLeft, ...) found on the
-//    AvatarHead / AvatarEyelashes / AvatarTeethLower meshes.
-//
-// Put the file at: public/models/avatar_3.glb  (Vite serves /public at
-// the site root, so the load path below is correct as long as it's there)
 
 let currentAvatarRoot = null
 let headMesh = null
@@ -308,20 +254,9 @@ loader.load(
     '/models/avatar_3.glb',
     (gltf) => {
         currentAvatarRoot = gltf.scene
-
         scene.add(gltf.scene)
-
-        // This rig may face the opposite way from what you expect by
-        // default — if the avatar loads facing AWAY from the camera,
-        // this flip fixes it. If it loads facing the WRONG way after
-        // this, just delete the next line.
-        // This rig conventionally faces +Z in its bind pose, which already
-        // points toward the camera in this scene's default setup — so no
-        // rotation flip needed here. If she still faces away, uncomment:
-        // gltf.scene.rotation.y = Math.PI
         gltf.scene.position.set(0, 0, 0)
 
-        // Find the meshes that carry facial morph targets
         gltf.scene.traverse((obj) => {
             if (!obj.isMesh) return
             if (obj.name === 'AvatarHead') headMesh = obj
@@ -330,19 +265,15 @@ loader.load(
         })
 
         setIdlePose(gltf.scene)
-
         console.log("Avatar loaded!", gltf)
 
         hideLoadingOverlay()
         startIdleBlinking()
 
-        // Greet once loaded and voices are ready
-        whenVoicesReady(() => {
-            setTimeout(() => {
-                triggerBowGesture()
-                speak("Hello, how can I assist you today? I'm the virtual assistant for EAH Jena.")
-            }, 800)
-        })
+        setTimeout(() => {
+            triggerBowGesture()
+            speak("Hello, how can I assist you today? I'm the virtual assistant for EAH Jena.")
+        }, 800)
     },
     undefined,
     (error) => {
@@ -352,24 +283,9 @@ loader.load(
 
 
 // ======================
-// Idle pose — hands clasped in front ("Japanese welcome" stance)
+// Idle Pose & Sway
 // ======================
-//
-// This replaces the old arms-at-sides resting pose. Instead, the avatar
-// now rests with hands together in front of the body — the pose she
-// stays in permanently, both before and after the bow gesture.
-//
-// IMPORTANT — the values below are an educated first guess, not tuned
-// values like the old arms-at-sides pose was. They're built from what
-// your tuning already taught us about this rig (upper arm rotation.x
-// lowers the arm to the side, rotation.z swings it forward/inward —
-// that's what caused the "zombie" arms earlier, and it's exactly what
-// we need now to bring the hands to the front). But a full two-handed
-// clasped pose is more complex than a single arm, so expect to need the
-// tuner (press P, keys 1-6) to get hands actually meeting/overlapping
-// rather than just close.
 
-// Filled in by setIdlePose, read every frame by applyIdleSway / applyGesture
 let idleBones = {}
 let idleBase = {}
 
@@ -381,96 +297,46 @@ function setIdlePose(root) {
         rightLowerArm: root.getObjectByName('RightForeArm'),
         leftHand: root.getObjectByName('LeftHand'),
         rightHand: root.getObjectByName('RightHand'),
-        // Proximal finger bones — this rig has full finger chains
         leftIndexProximal: root.getObjectByName('LeftHandIndex1'),
         rightIndexProximal: root.getObjectByName('RightHandIndex1'),
         leftMiddleProximal: root.getObjectByName('LeftHandMiddle1'),
         rightMiddleProximal: root.getObjectByName('RightHandMiddle1'),
-        // Spine — used for the bow gesture, not part of the arm pose
         spine: root.getObjectByName('Spine')
     }
 
-    // Upper arms and forearms: all four values below were found live via
-    // the pose tuner (press P) — actual working values for THIS rig's
-    // hands-together pose, not a guess.
     if (bones.leftUpperArm) bones.leftUpperArm.rotation.set(1.25, 1.10, -0.20)
     if (bones.rightUpperArm) bones.rightUpperArm.rotation.set(1.40, -0.85, 0.15)
-
     if (bones.leftLowerArm) bones.leftLowerArm.rotation.set(0.00, -0.40, 1.60)
     if (bones.rightLowerArm) bones.rightLowerArm.rotation.set(-0.05, 0.30, -1.50)
-
-    // Hands: left starts flat, right resting on top — still needs tuning
-    // (key 5 = rightHand, key 6 = leftHand)
     if (bones.leftHand) bones.leftHand.rotation.set(0, 0, 0.1)
     if (bones.rightHand) bones.rightHand.rotation.set(0, 0, -0.1)
 
     idleBones = bones
-    window.idleBones = bones // handy for manual console testing, e.g. idleBones.rightHand.rotation.z = 1
+    window.idleBones = bones
 
-    // Snapshot this resting pose — sway and gestures animate AROUND these
-    // values rather than replacing them, so the avatar always settles
-    // back to the same relaxed stance.
     idleBase = {}
     for (const key in bones) {
         if (bones[key]) idleBase[key] = bones[key].rotation.clone()
     }
 }
 
-
-// ======================
-// Idle sway ("körperlich" — a little physical presence)
-// ======================
-//
-// Small, slow sine offsets so the avatar doesn't look frozen between
-// blinks. With hands clasped together, left/right now move IN PHASE
-// (same sign, same timing) rather than opposite — swaying them
-// out-of-phase like before would make the hands visibly drift apart
-// during idle, which looks broken for a clasped-hands pose. Amplitude
-// is also lower than the old arms-at-sides version for the same reason.
-
 function applyIdleSway(elapsed) {
     const b = idleBones
     const base = idleBase
-
     const armSway = Math.sin(elapsed * 0.5) * 0.012
 
-    if (b.leftUpperArm && base.leftUpperArm) {
-        b.leftUpperArm.rotation.z = base.leftUpperArm.z + armSway
-    }
-    if (b.rightUpperArm && base.rightUpperArm) {
-        b.rightUpperArm.rotation.z = base.rightUpperArm.z + armSway
-    }
-    if (b.leftLowerArm && base.leftLowerArm) {
-        b.leftLowerArm.rotation.y = base.leftLowerArm.y + armSway
-    }
-    if (b.rightLowerArm && base.rightLowerArm) {
-        b.rightLowerArm.rotation.y = base.rightLowerArm.y + armSway
-    }
+    if (b.leftUpperArm && base.leftUpperArm) b.leftUpperArm.rotation.z = base.leftUpperArm.z + armSway
+    if (b.rightUpperArm && base.rightUpperArm) b.rightUpperArm.rotation.z = base.rightUpperArm.z + armSway
+    if (b.leftLowerArm && base.leftLowerArm) b.leftLowerArm.rotation.y = base.leftLowerArm.y + armSway
+    if (b.rightLowerArm && base.rightLowerArm) b.rightLowerArm.rotation.y = base.rightLowerArm.y + armSway
 
-    // Fingers — a very subtle curl drift (fine to leave out-of-phase,
-    // doesn't affect whether the hands stay together)
     if (b.leftIndexProximal) b.leftIndexProximal.rotation.x = 0.05 + Math.sin(elapsed * 0.7) * 0.03
     if (b.rightIndexProximal) b.rightIndexProximal.rotation.x = 0.05 + Math.sin(elapsed * 0.72 + 2.4) * 0.03
     if (b.leftMiddleProximal) b.leftMiddleProximal.rotation.x = 0.05 + Math.sin(elapsed * 0.65 + 1) * 0.03
     if (b.rightMiddleProximal) b.rightMiddleProximal.rotation.x = 0.05 + Math.sin(elapsed * 0.68 + 3) * 0.03
 }
 
-
-// ======================
-// One-off gestures (Japanese-style welcome bow)
-// ======================
-//
-// Runs on top of idle sway for a fixed duration, then hands control back.
-// Only the spine bends forward and back — the arms/hands stay exactly
-// where they are in the clasped resting pose the whole time, which is
-// what makes it read as a bow rather than a wave.
-//
-// rotation.x is the standard convention for forward/backward spine bend
-// on almost every humanoid rig — best first guess, but if she leans
-// sideways or twists instead of bending forward, use the tuner (press P,
-// key 7) to find the right axis on THIS bone.
-
-let activeGesture = null // { type, startTime, duration }
+let activeGesture = null
 
 function triggerBowGesture() {
     if (!idleBones.spine) return
@@ -479,7 +345,6 @@ function triggerBowGesture() {
 
 function applyActiveGesture() {
     if (!activeGesture) return
-
     const t = clock.getElapsedTime() - activeGesture.startTime
 
     if (t > activeGesture.duration) {
@@ -490,10 +355,6 @@ function applyActiveGesture() {
     if (activeGesture.type === 'bow') {
         const b = idleBones
         const base = idleBase
-
-        // Rise, hold, then FALL back to 0 over the final stretch — lift
-        // returns to exactly 0 by the time the gesture ends, so the
-        // handoff back to idle sway is seamless instead of a jump-cut.
         const riseTime = 0.7
         const fallTime = 0.7
         const fallStart = activeGesture.duration - fallTime
@@ -506,13 +367,9 @@ function applyActiveGesture() {
         } else {
             lift = Math.max(0, (activeGesture.duration - t) / fallTime)
         }
-        // Ease (smoothstep) instead of linear, so the bow feels less
-        // mechanical — a real bow doesn't move at constant speed
         const eased = lift * lift * (3 - 2 * lift)
 
         if (b.spine && base.spine) {
-            // A polite ~20° bow (0.35 rad) — modest, not a deep formal
-            // bow. Increase toward ~0.5-0.6 for a deeper one.
             b.spine.rotation.x = base.spine.x + eased * 0.35
         }
     }
@@ -520,12 +377,8 @@ function applyActiveGesture() {
 
 
 // ======================
-// Facial animation helper
+// Morph Targets & Blinking
 // ======================
-//
-// Sets a named morph target's influence across every mesh that has it.
-// Different meshes carry different subsets (e.g. only AvatarHead and
-// AvatarTeethLower have jawOpen — AvatarTeethUpper doesn't move).
 
 function setMorph(meshes, name, value) {
     meshes.forEach((mesh) => {
@@ -537,145 +390,15 @@ function setMorph(meshes, name, value) {
     })
 }
 
-
-// ======================
-// Live pose tuner (press P in the browser)
-// ======================
-//
-// Since I can't see your render from here, this lets YOU find the right
-// rotation values interactively instead of me guessing axes blindly.
-//
-//   P              toggle the tuner panel on/off (also freezes idle sway
-//                  AND freezes any in-progress bow gesture, so your
-//                  edits aren't overwritten every frame)
-//   1-7            select: left upper arm / right upper arm / left
-//                  forearm / right forearm / right hand / left hand /
-//                  spine (for the bow)
-//   Arrow Left/Right   adjust Z rotation
-//   Arrow Up/Down      adjust X rotation
-//   Shift + Up/Down    adjust Y rotation
-//   R              reset selected bone to its original bind rotation
-//
-// For the hands-together pose specifically: the current values in
-// setIdlePose are an educated guess, not tuned. Use 1/2/3/4/5/6 to bring
-// the hands actually together (they'll likely be close but not
-// overlapping at first). For the bow, reload the page, and right as she
-// starts bowing press P — this freezes mid-bow so you can select 7 and
-// find the correct forward-bend axis/sign for the spine.
-//
-// Once everything looks right, send me all the rotation.set(...) lines
-// together and I'll bake them into setIdlePose (for 1-6) and the bow
-// gesture (for 7) in one pass.
-
-let tunerActive = false
-let tunerSelection = 'leftUpperArm'
-const tunerBindRotation = {} // original T-pose rotation, for the R reset key
-
-const TUNER_BONES = {
-    '1': 'leftUpperArm',
-    '2': 'rightUpperArm',
-    '3': 'leftLowerArm',
-    '4': 'rightLowerArm',
-    '5': 'rightHand',
-    '6': 'leftHand',
-    '7': 'spine'
-}
-
-function buildTunerPanel() {
-    const panel = document.createElement('div')
-    panel.id = 'pose-tuner'
-    panel.style.cssText = `
-        position: fixed; bottom: 100px; right: 24px; z-index: 20;
-        font-family: 'JetBrains Mono', monospace; font-size: 12px;
-        background: rgba(16,32,31,0.88); color: #7fd0d0;
-        padding: 12px 14px; border-radius: 10px; line-height: 1.6;
-        white-space: pre; display: none; max-width: 340px;
-    `
-    document.body.appendChild(panel)
-    return panel
-}
-
-const tunerPanel = buildTunerPanel()
-
-function updateTunerPanel() {
-    const bone = idleBones[tunerSelection]
-    if (!bone) {
-        tunerPanel.textContent = `No bone found for "${tunerSelection}"`
-        return
-    }
-    const r = bone.rotation
-    tunerPanel.textContent =
-`POSE TUNER — press P to close
-selected: ${tunerSelection}  (1-4 to switch)
-x: ${r.x.toFixed(2)}  y: ${r.y.toFixed(2)}  z: ${r.z.toFixed(2)}
-
-← → z-axis   ↑ ↓ x-axis   shift+↑↓ y-axis   R reset
-
-paste into setIdlePose():
-bones.${tunerSelection}.rotation.set(${r.x.toFixed(2)}, ${r.y.toFixed(2)}, ${r.z.toFixed(2)})`
-}
-
-window.addEventListener('keydown', (e) => {
-    // Don't hijack typing in the chat input
-    if (document.activeElement && document.activeElement.id === 'chat-input') return
-
-    if (e.key === 'p' || e.key === 'P') {
-        tunerActive = !tunerActive
-        tunerPanel.style.display = tunerActive ? 'block' : 'none'
-        if (tunerActive) updateTunerPanel()
-        return
-    }
-
-    if (!tunerActive) return
-
-    if (TUNER_BONES[e.key]) {
-        tunerSelection = TUNER_BONES[e.key]
-        updateTunerPanel()
-        return
-    }
-
-    const bone = idleBones[tunerSelection]
-    if (!bone) return
-
-    const step = 0.05
-
-    if (!(tunerSelection in tunerBindRotation)) {
-        tunerBindRotation[tunerSelection] = bone.rotation.clone()
-    }
-
-    if (e.key === 'ArrowLeft') bone.rotation.z -= step
-    else if (e.key === 'ArrowRight') bone.rotation.z += step
-    else if (e.key === 'ArrowUp' && !e.shiftKey) bone.rotation.x -= step
-    else if (e.key === 'ArrowDown' && !e.shiftKey) bone.rotation.x += step
-    else if (e.key === 'ArrowUp' && e.shiftKey) bone.rotation.y -= step
-    else if (e.key === 'ArrowDown' && e.shiftKey) bone.rotation.y += step
-    else if (e.key === 'r' || e.key === 'R') {
-        bone.rotation.copy(tunerBindRotation[tunerSelection])
-    } else {
-        return
-    }
-
-    e.preventDefault()
-    updateTunerPanel()
-})
-
-
-// ======================
-// Idle blinking (natural, randomized)
-// ======================
-
 function startIdleBlinking() {
     if (!headMesh && !eyelashMesh) return
-
     const faces = [headMesh, eyelashMesh]
 
     function blinkLoop() {
-        const nextBlinkIn = 2000 + Math.random() * 4000 // every 2-6s
-
+        const nextBlinkIn = 2000 + Math.random() * 4000
         setTimeout(() => {
             setMorph(faces, "eyeBlinkLeft", 1)
             setMorph(faces, "eyeBlinkRight", 1)
-
             setTimeout(() => {
                 setMorph(faces, "eyeBlinkLeft", 0)
                 setMorph(faces, "eyeBlinkRight", 0)
@@ -683,102 +406,80 @@ function startIdleBlinking() {
             }, 150)
         }, nextBlinkIn)
     }
-
     blinkLoop()
 }
 
 
 // ======================
-// Speech + basic lip-sync
+// Neural Voice & Audio Lip-Sync
 // ======================
 
-let voicesCache = []
-let voicesReadyCallbacks = []
-let voicesReady = false
-
-function whenVoicesReady(cb) {
-    if (voicesReady) {
-        cb()
-    } else {
-        voicesReadyCallbacks.push(cb)
-    }
-}
-
-function loadVoices() {
-    const voices = window.speechSynthesis.getVoices()
-    if (voices.length > 0) {
-        voicesCache = voices
-        voicesReady = true
-        voicesReadyCallbacks.forEach(cb => cb())
-        voicesReadyCallbacks = []
-    }
-}
-
-// Some browsers have voices immediately, others fire the event later
-loadVoices()
-window.speechSynthesis.onvoiceschanged = loadVoices
-
-function pickVoice() {
-    return voicesCache.find(v =>
-        v.name.toLowerCase().includes("zira") ||
-        v.name.toLowerCase().includes("jenny") ||
-        v.name.toLowerCase().includes("aria") ||
-        v.name.toLowerCase().includes("female")
-    )
-}
-
-// Driven per-frame from animate() via updateLipSync(), not a setInterval —
-// that's what makes it smooth instead of a hard on/off flicker.
+let audioAnalyser = null
+let audioDataArray = null
+let audioCtx = null
 let isSpeaking = false
 let currentJaw = 0
 
-function startLipSync() {
-    isSpeaking = true
-}
-
-function stopLipSync() {
-    isSpeaking = false
-}
+function startLipSync() { isSpeaking = true }
+function stopLipSync() { isSpeaking = false }
 
 function updateLipSync(elapsed) {
     if (!headMesh) return
 
     let target = 0
 
-    if (isSpeaking) {
-        // Two layered sine waves at different speeds so it doesn't look
-        // like a metronome — and capped low on purpose. This was too
-        // extreme before (toggling up to 0.8 instantly); real speech
-        // barely opens the jaw past ~0.3-0.35 most of the time.
-        const wave =
-            (Math.sin(elapsed * 9) * 0.5 + 0.5) * 0.22 +
-            (Math.sin(elapsed * 17 + 1) * 0.5 + 0.5) * 0.08
+    if (isSpeaking && audioAnalyser && audioDataArray) {
+        audioAnalyser.getByteFrequencyData(audioDataArray)
+        let sum = 0
+        for (let i = 0; i < audioDataArray.length; i++) {
+            sum += audioDataArray[i]
+        }
+        let average = sum / audioDataArray.length
+        target = Math.min((average / 128) * 0.35, 0.35)
+    } else if (isSpeaking) {
+        const wave = (Math.sin(elapsed * 9) * 0.5 + 0.5) * 0.22
         target = Math.min(0.08 + wave, 0.35)
     }
 
-    // Smooth toward the target instead of snapping — removes the "wild"
-    // flicker and makes it read as a mouth moving, not a switch flipping.
     currentJaw += (target - currentJaw) * 0.25
-
-    // jawOpen exists on both AvatarHead and AvatarTeethLower — move both
-    // together so the teeth don't lag behind the jaw visually
     setMorph([headMesh, teethLowerMesh], "jawOpen", currentJaw)
 }
 
-function speak(text) {
+
+
+let selectedFemaleVoice = null
+
+// Load browser voices asynchronously when available
+function loadVoices() {
+    const voices = window.speechSynthesis.getVoices()
+    selectedFemaleVoice = voices.find(v => 
+        v.lang.startsWith('en') && (
+            v.name.includes('Zira') || 
+            v.name.includes('Aria') || 
+            v.name.includes('Jenny') || 
+            v.name.includes('Samantha') || 
+            v.name.includes('Karen') || 
+            v.name.includes('Victoria') ||
+            v.name.toLowerCase().includes('female')
+        )
+    ) || voices.find(v => v.lang.startsWith('en'))
+}
+
+if ('speechSynthesis' in window) {
+    loadVoices()
+    window.speechSynthesis.onvoiceschanged = loadVoices
+}
+
+// Use browser TTS as a fallback if neural TTS fails or is unavailable
+async function speak(text) {
     setSubtitle(text)
-
+    
     const speech = new SpeechSynthesisUtterance(text)
-
-    const voice = pickVoice()
-    if (voice) {
-        speech.voice = voice
-        console.log("Using voice:", voice.name)
-    }
-
     speech.lang = "en-US"
-    speech.pitch = 1.5
-    speech.rate = 1.05
+
+    if (selectedFemaleVoice) {
+        speech.voice = selectedFemaleVoice
+    }
 
     speech.onstart = () => startLipSync()
     speech.onend = () => {
@@ -793,9 +494,67 @@ function speak(text) {
     window.speechSynthesis.speak(speech)
 }
 
+// ======================
+// Neural TTS (ElevenLabs) - currently disabled in favor of browser TTS
+// ======================
+// async function speak(text) {
+//     setSubtitle(text)
+
+//     try {
+//         const response = await fetch(TTS_ENDPOINT, {
+//             method: "POST",
+//             headers: { "Content-Type": "application/json" },
+//             body: JSON.stringify({ text })
+//         })
+
+//         if (!response.ok) throw new Error("Backend TTS unavailable")
+
+//         const blob = await response.blob()
+//         const audioUrl = URL.createObjectURL(blob)
+//         const audio = new Audio(audioUrl)
+
+//         if (!audioCtx) {
+//             audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+//         }
+//         if (audioCtx.state === 'suspended') {
+//             await audioCtx.resume()
+//         }
+
+//         const source = audioCtx.createMediaElementSource(audio)
+//         const analyser = audioCtx.createAnalyser()
+//         analyser.fftSize = 256
+//         source.connect(analyser)
+//         analyser.connect(audioCtx.destination)
+
+//         audioAnalyser = analyser
+//         audioDataArray = new Uint8Array(analyser.frequencyBinCount)
+
+//         audio.onplay = () => startLipSync()
+//         audio.onended = () => {
+//             stopLipSync()
+//             setSubtitle("")
+//             audioAnalyser = null
+//         }
+//         audio.onerror = () => {
+//             stopLipSync()
+//             setSubtitle("")
+//             audioAnalyser = null
+//         }
+
+//         await audio.play()
+
+//     } catch (err) {
+//         console.warn("Neural TTS failed, falling back to browser speech:", err)
+//         const speech = new SpeechSynthesisUtterance(text)
+//         speech.onstart = () => startLipSync()
+//         speech.onend = () => { stopLipSync(); setSubtitle("") }
+//         window.speechSynthesis.speak(speech)
+//     }
+// }
+
 
 // ======================
-// Chat UI (text input + mic)
+// Chat UI & Input
 // ======================
 
 function buildChatUI() {
@@ -835,9 +594,7 @@ function buildChatUI() {
     async function handleQuestion(text) {
         if (!text || !text.trim()) return
         input.value = ""
-
         setSubtitle("Thinking...")
-
         const answer = await getAnswer(text)
         speak(answer)
     }
@@ -847,7 +604,6 @@ function buildChatUI() {
         if (e.key === "Enter") handleQuestion(input.value)
     })
 
-    // Optional: voice input via Web Speech API (Chrome/Edge support it)
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (SpeechRecognition) {
         const recognition = new SpeechRecognition()
@@ -870,7 +626,6 @@ function buildChatUI() {
             micBtn.classList.remove("listening")
             micBtn.textContent = "🎤"
         }
-
         recognition.onerror = () => {
             micBtn.classList.remove("listening")
             micBtn.textContent = "🎤"
@@ -896,7 +651,7 @@ buildChatUI()
 
 
 // ======================
-// Animation
+// Main Animation Loop
 // ======================
 
 const clock = new THREE.Clock()
@@ -908,14 +663,9 @@ function animate() {
     const elapsed = clock.getElapsedTime()
 
     if (currentAvatarRoot) {
-        if (!tunerActive) {
-            applyIdleSway(elapsed)
-            applyActiveGesture()
-        }
-
+        applyIdleSway(elapsed)
+        applyActiveGesture()
         updateLipSync(elapsed)
-
-        // very small breathing
         currentAvatarRoot.position.y = Math.sin(Date.now() * 0.0015) * 0.005
     }
 
@@ -926,7 +676,7 @@ animate()
 
 
 // ======================
-// Resize
+// Resize Handling
 // ======================
 
 window.addEventListener("resize", () => {
