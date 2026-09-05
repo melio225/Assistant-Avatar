@@ -6,4 +6,4 @@ Backend:
 https://assistant-avatar.onrender.com
 
 Frontend:
-https://assistant-avatar-eddi.vercel.app/
+https://assistant-avatar-eddi.vercel.app
