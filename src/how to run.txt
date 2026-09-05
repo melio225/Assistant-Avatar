@@ -2,3 +2,8 @@
 1- npm install
 2- npm run dev
 
+Backend:
+https://assistant-avatar.onrender.com
+
+Frontend:
+https://assistant-avatar-eddi.vercel.app/
