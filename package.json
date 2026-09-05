@@ -1,0 +1,27 @@
+{
+  "name": "ai-avatar",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^8.1.1"
+  },
+  "dependencies": {
+    "@google/genai": "^2.15.0",
+    "@google/generative-ai": "^0.24.1",
+    "@pixiv/three-vrm": "^3.5.5",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "three": "^0.185.1"
+  },
+  "allowScripts": {
+    "@google/genai@2.13.0": true,
+    "protobufjs@7.6.5": true
+  }
+}

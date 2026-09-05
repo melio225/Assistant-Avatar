@@ -1,0 +1,7 @@
+#this is how to run Backend:
+
+1- npm install @google/genai express cors dotenv
+
+2- cd server
+3- node server.js
+
