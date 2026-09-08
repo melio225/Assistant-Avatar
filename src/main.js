@@ -458,7 +458,7 @@ let selectedFemaleVoice = null
 function loadVoices() {
     const voices = window.speechSynthesis.getVoices()
     selectedFemaleVoice = voices.find(v => 
-        v.lang.startsWith('en') && (
+        v.lang.startsWith('en') && ( // 'de' or 'en' for German or English
             v.name.includes('Zira') || 
             v.name.includes('Aria') || 
             v.name.includes('Jenny') || 
@@ -467,7 +467,7 @@ function loadVoices() {
             v.name.includes('Victoria') ||
             v.name.toLowerCase().includes('female')
         )
-    ) || voices.find(v => v.lang.startsWith('en'))
+    ) || voices.find(v => v.lang.startsWith('en')) // 'de' or 'en' for German or English
 }
 
 if ('speechSynthesis' in window) {
@@ -480,7 +480,7 @@ async function speak(text) {
     setSubtitle(text)
     
     const speech = new SpeechSynthesisUtterance(text)
-    speech.lang = "en-US"
+    speech.lang = "en-US" // "de-DE" or "en-US" 
 
     if (selectedFemaleVoice) {
         speech.voice = selectedFemaleVoice
