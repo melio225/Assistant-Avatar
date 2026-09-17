@@ -1,18 +1,14 @@
 import './style.css'
 
 import * as THREE from 'three'
-
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 
-// Your project already has this at src/assets/EAH_Logo.png
 import eahLogoUrl from './assets/EAH_Logo.png'
 
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 
 // ======================
-// EAH Jena Knowledge Base
+// EAH Jena Knowledge Base (offline fallback)
 // ======================
 
 const KNOWLEDGE_BASE = [
@@ -59,17 +55,17 @@ function findAnswer(question) {
     return FALLBACK_ANSWER
 }
 
-// ======================
-// Backend Endpoints
-// ======================
 
-// In local dev this falls back to localhost. In production, set
-// VITE_API_BASE_URL in your hosting provider's environment variables to
-// your deployed backend's URL (e.g. https://your-backend.onrender.com) —
-// Vite bakes this in at build time, so it must be set BEFORE you build/deploy.
+// ======================
+// Backend
+// ======================
+//
+// Set VITE_API_BASE_URL at build time in production. Leave it empty when
+// frontend and backend share a domain — requests then go to /api/... on
+// the same origin, so no CORS is involved.
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001"
 const CHAT_ENDPOINT = `${API_BASE_URL}/api/chat`
-const TTS_ENDPOINT = `${API_BASE_URL}/api/tts`
 
 let conversationHistory = []
 
@@ -78,10 +74,7 @@ async function getAnswer(question) {
         const response = await fetch(CHAT_ENDPOINT, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                question,
-                history: conversationHistory
-            })
+            body: JSON.stringify({ question, history: conversationHistory })
         })
 
         if (!response.ok) throw new Error("Backend returned " + response.status)
@@ -105,7 +98,7 @@ async function getAnswer(question) {
 
 
 // ======================
-// Scene background
+// Scene
 // ======================
 
 function createGradientBackground() {
@@ -115,18 +108,15 @@ function createGradientBackground() {
 
     const ctx = canvas.getContext("2d")
     const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height)
-
-    // Richer EAH Jena teal gradient (less stark white)
-    gradient.addColorStop(0, "#004d4d")     // Deep teal at top
-    gradient.addColorStop(0.5, "#007373")   // Mid teal
-    gradient.addColorStop(1, "#a9d6d6")     // Soft muted teal at bottom (instead of pure white)
+    gradient.addColorStop(0, "#004d4d")
+    gradient.addColorStop(0.5, "#007373")
+    gradient.addColorStop(1, "#a9d6d6")
 
     ctx.fillStyle = gradient
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     const texture = new THREE.CanvasTexture(canvas)
     texture.colorSpace = THREE.SRGBColorSpace
-
     return texture
 }
 
@@ -136,19 +126,18 @@ scene.background = createGradientBackground()
 const ground = new THREE.Mesh(
     new THREE.CircleGeometry(2.2, 64),
     new THREE.MeshStandardMaterial({
-        color: 0x003333, // Darker teal ground tint
+        color: 0x003333,
         transparent: true,
         opacity: 0.25,
         roughness: 0.8
     })
 )
 ground.rotation.x = -Math.PI / 2
-ground.position.y = 0
 scene.add(ground)
 
 
 // ======================
-// DOM UI Elements
+// DOM chrome (loading overlay, badge, vignette)
 // ======================
 
 function buildLoadingOverlay() {
@@ -194,7 +183,6 @@ function buildBadge() {
 
     textCol.appendChild(title)
     textCol.appendChild(sub)
-
     badge.appendChild(logo)
     badge.appendChild(textCol)
     document.body.appendChild(badge)
@@ -212,7 +200,7 @@ buildVignette()
 
 
 // ======================
-// Camera & Renderer
+// Camera, renderer, controls, lights
 // ======================
 
 const camera = new THREE.PerspectiveCamera(
@@ -233,11 +221,6 @@ const controls = new OrbitControls(camera, renderer.domElement)
 controls.target.set(0, 1.2, 0)
 controls.update()
 
-
-// ======================
-// Lights
-// ======================
-
 const directionalLight = new THREE.DirectionalLight(0xffffff, 3)
 directionalLight.position.set(1, 2, 3)
 scene.add(directionalLight)
@@ -245,7 +228,7 @@ scene.add(new THREE.AmbientLight(0xffffff, 1))
 
 
 // ======================
-// Avatar Loading
+// Avatar loading
 // ======================
 
 let currentAvatarRoot = null
@@ -270,8 +253,6 @@ loader.load(
         })
 
         setIdlePose(gltf.scene)
-        console.log("Avatar loaded!", gltf)
-
         hideLoadingOverlay()
         startIdleBlinking()
 
@@ -288,8 +269,11 @@ loader.load(
 
 
 // ======================
-// Idle Pose & Sway
+// Idle pose & sway
 // ======================
+//
+// Rotation values were tuned live against this specific rig — they are
+// not generic and will not transfer to a different avatar model.
 
 let idleBones = {}
 let idleBase = {}
@@ -317,7 +301,6 @@ function setIdlePose(root) {
     if (bones.rightHand) bones.rightHand.rotation.set(0, 0, -0.1)
 
     idleBones = bones
-    window.idleBones = bones
 
     idleBase = {}
     for (const key in bones) {
@@ -341,6 +324,11 @@ function applyIdleSway(elapsed) {
     if (b.rightMiddleProximal) b.rightMiddleProximal.rotation.x = 0.05 + Math.sin(elapsed * 0.68 + 3) * 0.03
 }
 
+
+// ======================
+// Bow gesture
+// ======================
+
 let activeGesture = null
 
 function triggerBowGesture() {
@@ -358,8 +346,6 @@ function applyActiveGesture() {
     }
 
     if (activeGesture.type === 'bow') {
-        const b = idleBones
-        const base = idleBase
         const riseTime = 0.7
         const fallTime = 0.7
         const fallStart = activeGesture.duration - fallTime
@@ -374,15 +360,15 @@ function applyActiveGesture() {
         }
         const eased = lift * lift * (3 - 2 * lift)
 
-        if (b.spine && base.spine) {
-            b.spine.rotation.x = base.spine.x + eased * 0.35
+        if (idleBones.spine && idleBase.spine) {
+            idleBones.spine.rotation.x = idleBase.spine.x + eased * 0.35
         }
     }
 }
 
 
 // ======================
-// Morph Targets & Blinking
+// Facial animation (blendshapes)
 // ======================
 
 function setMorph(meshes, name, value) {
@@ -416,12 +402,9 @@ function startIdleBlinking() {
 
 
 // ======================
-// Neural Voice & Audio Lip-Sync
+// Speech & lip-sync
 // ======================
 
-let audioAnalyser = null
-let audioDataArray = null
-let audioCtx = null
 let isSpeaking = false
 let currentJaw = 0
 
@@ -432,16 +415,7 @@ function updateLipSync(elapsed) {
     if (!headMesh) return
 
     let target = 0
-
-    if (isSpeaking && audioAnalyser && audioDataArray) {
-        audioAnalyser.getByteFrequencyData(audioDataArray)
-        let sum = 0
-        for (let i = 0; i < audioDataArray.length; i++) {
-            sum += audioDataArray[i]
-        }
-        let average = sum / audioDataArray.length
-        target = Math.min((average / 128) * 0.35, 0.35)
-    } else if (isSpeaking) {
+    if (isSpeaking) {
         const wave = (Math.sin(elapsed * 9) * 0.5 + 0.5) * 0.22
         target = Math.min(0.08 + wave, 0.35)
     }
@@ -450,24 +424,21 @@ function updateLipSync(elapsed) {
     setMorph([headMesh, teethLowerMesh], "jawOpen", currentJaw)
 }
 
+let selectedVoice = null
 
-
-let selectedFemaleVoice = null
-
-// Load browser voices asynchronously when available
 function loadVoices() {
     const voices = window.speechSynthesis.getVoices()
-    selectedFemaleVoice = voices.find(v => 
-        v.lang.startsWith('en') && ( // 'de' or 'en' for German or English
-            v.name.includes('Zira') || 
-            v.name.includes('Aria') || 
-            v.name.includes('Jenny') || 
-            v.name.includes('Samantha') || 
-            v.name.includes('Karen') || 
+    selectedVoice = voices.find(v =>
+        v.lang.startsWith('en') && (
+            v.name.includes('Zira') ||
+            v.name.includes('Aria') ||
+            v.name.includes('Jenny') ||
+            v.name.includes('Samantha') ||
+            v.name.includes('Karen') ||
             v.name.includes('Victoria') ||
             v.name.toLowerCase().includes('female')
         )
-    ) || voices.find(v => v.lang.startsWith('en')) // 'de' or 'en' for German or English
+    ) || voices.find(v => v.lang.startsWith('en'))
 }
 
 if ('speechSynthesis' in window) {
@@ -475,16 +446,12 @@ if ('speechSynthesis' in window) {
     window.speechSynthesis.onvoiceschanged = loadVoices
 }
 
-// Use browser TTS as a fallback if neural TTS fails or is unavailable
-async function speak(text) {
+function speak(text) {
     setSubtitle(text)
-    
-    const speech = new SpeechSynthesisUtterance(text)
-    speech.lang = "en-US" // "de-DE" or "en-US" 
 
-    if (selectedFemaleVoice) {
-        speech.voice = selectedFemaleVoice
-    }
+    const speech = new SpeechSynthesisUtterance(text)
+    speech.lang = "en-US"
+    if (selectedVoice) speech.voice = selectedVoice
 
     speech.onstart = () => startLipSync()
     speech.onend = () => {
@@ -499,68 +466,21 @@ async function speak(text) {
     window.speechSynthesis.speak(speech)
 }
 
-// ======================
-// Neural TTS (ElevenLabs) - currently disabled in favor of browser TTS
-// ======================
-// async function speak(text) {
-//     setSubtitle(text)
-
-//     try {
-//         const response = await fetch(TTS_ENDPOINT, {
-//             method: "POST",
-//             headers: { "Content-Type": "application/json" },
-//             body: JSON.stringify({ text })
-//         })
-
-//         if (!response.ok) throw new Error("Backend TTS unavailable")
-
-//         const blob = await response.blob()
-//         const audioUrl = URL.createObjectURL(blob)
-//         const audio = new Audio(audioUrl)
-
-//         if (!audioCtx) {
-//             audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-//         }
-//         if (audioCtx.state === 'suspended') {
-//             await audioCtx.resume()
-//         }
-
-//         const source = audioCtx.createMediaElementSource(audio)
-//         const analyser = audioCtx.createAnalyser()
-//         analyser.fftSize = 256
-//         source.connect(analyser)
-//         analyser.connect(audioCtx.destination)
-
-//         audioAnalyser = analyser
-//         audioDataArray = new Uint8Array(analyser.frequencyBinCount)
-
-//         audio.onplay = () => startLipSync()
-//         audio.onended = () => {
-//             stopLipSync()
-//             setSubtitle("")
-//             audioAnalyser = null
-//         }
-//         audio.onerror = () => {
-//             stopLipSync()
-//             setSubtitle("")
-//             audioAnalyser = null
-//         }
-
-//         await audio.play()
-
-//     } catch (err) {
-//         console.warn("Neural TTS failed, falling back to browser speech:", err)
-//         const speech = new SpeechSynthesisUtterance(text)
-//         speech.onstart = () => startLipSync()
-//         speech.onend = () => { stopLipSync(); setSubtitle("") }
-//         window.speechSynthesis.speak(speech)
-//     }
-// }
-
 
 // ======================
-// Chat UI & Input
+// Chat UI
 // ======================
+
+function setSubtitle(text) {
+    const el = document.getElementById("avatar-subtitle")
+    if (!el) return
+    if (text) {
+        el.textContent = text
+        el.classList.add("visible")
+    } else {
+        el.classList.remove("visible")
+    }
+}
 
 function buildChatUI() {
     const container = document.createElement("div")
@@ -591,7 +511,6 @@ function buildChatUI() {
     row.appendChild(input)
     row.appendChild(micBtn)
     row.appendChild(sendBtn)
-
     container.appendChild(subtitle)
     container.appendChild(row)
     document.body.appendChild(container)
@@ -641,30 +560,17 @@ function buildChatUI() {
     }
 }
 
-function setSubtitle(text) {
-    const el = document.getElementById("avatar-subtitle")
-    if (!el) return
-    if (text) {
-        el.textContent = text
-        el.classList.add("visible")
-    } else {
-        el.classList.remove("visible")
-    }
-}
-
 buildChatUI()
 
 
 // ======================
-// Main Animation Loop
+// Animation loop
 // ======================
 
 const clock = new THREE.Clock()
 
 function animate() {
     requestAnimationFrame(animate)
-
-    clock.getDelta()
     const elapsed = clock.getElapsedTime()
 
     if (currentAvatarRoot) {
@@ -681,7 +587,7 @@ animate()
 
 
 // ======================
-// Resize Handling
+// Resize
 // ======================
 
 window.addEventListener("resize", () => {
