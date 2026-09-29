@@ -240,7 +240,7 @@ let teethLowerMesh = null
 const loader = new GLTFLoader()
 
 loader.load(
-    '/models/avatar_3.glb',
+    '/models/avatar_1.glb',
     (gltf) => {
         currentAvatarRoot = gltf.scene
         scene.add(gltf.scene)
