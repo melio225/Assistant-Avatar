@@ -1,6 +1,6 @@
 #this is how to run website:
-1- npm install
-2- npm run dev
+1- npm install @mistralai/mistralai
+2- npm run dev / npm start
 
 Backend:
 https://assistant-avatar.onrender.com

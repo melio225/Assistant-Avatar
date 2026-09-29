@@ -13,37 +13,37 @@ import eahLogoUrl from './assets/EAH_Logo.png'
 
 const KNOWLEDGE_BASE = [
     {
-        keywords: ["what is eah", "about eah", "who are you", "what university", "welcome"],
-        answer: "I'm the virtual assistant for Ernst-Abbe-Hochschule Jena, EAH Jena for short. We're a university of applied sciences in Jena, Germany, founded in 1991, with around four thousand two hundred students."
+        keywords: ["was ist die eah", "über die eah", "wer bist du", "welche hochschule", "willkommen"],
+        answer: "Ich bin der virtuelle Assistent der Ernst-Abbe-Hochschule Jena, kurz EAH Jena. Wir sind eine Hochschule für angewandte Wissenschaften in Jena, gegründet 1991, mit rund viertausendzweihundert Studierenden."
     },
     {
-        keywords: ["program", "study", "course", "degree", "faculty", "faculties"],
-        answer: "EAH Jena offers about fifty bachelor's and master's programs across four fields: technology, business, social affairs, and health. That includes subjects like electrical engineering, mechanical engineering, medical engineering and biotechnology, business administration, and health and nursing."
+        keywords: ["studiengang", "studium", "studieren", "fach", "fachbereich", "fachbereiche"],
+        answer: "Die EAH Jena bietet rund fünfzig Bachelor- und Masterstudiengänge in vier Bereichen: Technik, Wirtschaft, Soziales und Gesundheit. Dazu gehören zum Beispiel Elektrotechnik, Maschinenbau, Medizintechnik und Biotechnologie, Betriebswirtschaft sowie Gesundheit und Pflege."
     },
     {
-        keywords: ["location", "where", "address", "campus"],
-        answer: "Our campus is on the Carl-Zeiss-Promenade in Jena, in the state of Thuringia, Germany."
+        keywords: ["lage", "wo ist", "adresse", "campus"],
+        answer: "Unser Campus liegt an der Carl-Zeiss-Promenade in Jena, im Bundesland Thüringen."
     },
     {
-        keywords: ["admission", "apply", "application", "deadline", "enroll"],
-        answer: "Most of our programs are admission-free, and many are also tuition-free. Application deadlines are typically July 15th for the winter semester and February 15th for the summer semester, though it's best to check the specific program page for exact dates."
+        keywords: ["zulassung", "bewerben", "bewerbung", "frist", "einschreiben"],
+        answer: "Die meisten unserer Studiengänge sind zulassungsfrei, viele auch gebührenfrei. Bewerbungsfristen sind in der Regel der 15. Juli für das Wintersemester und der 15. Februar für das Sommersemester — genaue Termine findest du auf der jeweiligen Studiengangsseite."
     },
     {
-        keywords: ["history", "founded", "when was", "ernst abbe"],
-        answer: "The university was founded in 1991 and took the name Ernst-Abbe-Hochschule in 2014, named after Ernst Abbe, a researcher, entrepreneur, and social reformer connected to the Zeiss and Jena scientific tradition."
+        keywords: ["geschichte", "gegründet", "wann wurde", "ernst abbe"],
+        answer: "Die Hochschule wurde 1991 gegründet und trägt seit 2014 den Namen Ernst-Abbe-Hochschule, benannt nach Ernst Abbe, einem Forscher, Unternehmer und Sozialreformer aus der Zeiss- und Jenaer Wissenschaftstradition."
     },
     {
-        keywords: ["hello", "hi", "hey"],
-        answer: "Hello! Welcome to EAH Jena. What would you like to know?"
+        keywords: ["hallo", "hi", "guten tag"],
+        answer: "Hallo! Willkommen an der EAH Jena. Was möchtest du wissen?"
     },
     {
-        keywords: ["thank", "thanks"],
-        answer: "You're very welcome! Let me know if there's anything else you'd like to know about EAH Jena."
+        keywords: ["danke", "vielen dank"],
+        answer: "Gerne! Sag Bescheid, wenn du noch etwas über die EAH Jena wissen möchtest."
     }
 ]
 
 const FALLBACK_ANSWER =
-    "That's a great question — I don't have that detail yet, but I'd recommend checking eah-jena.de or asking at the student services desk for the most accurate answer."
+    "Das ist eine gute Frage — dazu habe ich noch keine Angabe, aber ich empfehle, auf eah-jena.de nachzuschauen oder das Studierendensekretariat zu fragen."
 
 function findAnswer(question) {
     const q = question.toLowerCase()
@@ -66,6 +66,7 @@ function findAnswer(question) {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001"
 const CHAT_ENDPOINT = `${API_BASE_URL}/api/chat`
+const TTS_ENDPOINT = `${API_BASE_URL}/api/tts`
 
 let conversationHistory = []
 
@@ -149,7 +150,7 @@ function buildLoadingOverlay() {
 
     const text = document.createElement("div")
     text.className = "loading-text"
-    text.textContent = "Loading assistant..."
+    text.textContent = "Assistent wird geladen..."
 
     overlay.appendChild(spinner)
     overlay.appendChild(text)
@@ -179,7 +180,7 @@ function buildBadge() {
 
     const sub = document.createElement("div")
     sub.className = "badge-sub"
-    sub.textContent = "Virtual Campus Assistant"
+    sub.textContent = "Virtueller Campus-Assistent"
 
     textCol.appendChild(title)
     textCol.appendChild(sub)
@@ -258,7 +259,7 @@ loader.load(
 
         setTimeout(() => {
             triggerBowGesture()
-            speak("Hello, how can I assist you today? I'm the virtual assistant for EAH Jena.")
+            speak("Hallo, wie kann ich dir heute helfen? Ich bin der virtuelle Assistent der EAH Jena.")
         }, 800)
     },
     undefined,
@@ -408,16 +409,29 @@ function startIdleBlinking() {
 let isSpeaking = false
 let currentJaw = 0
 
+// When ElevenLabs timing data is driving the mouth, this holds the
+// current target jaw-open value each frame. Null means "no real timing
+// available right now" — updateLipSync then falls back to the sine wave,
+// which is what happens automatically during browser-TTS fallback.
+let externalJawTarget = null
+
 function startLipSync() { isSpeaking = true }
-function stopLipSync() { isSpeaking = false }
+function stopLipSync() {
+    isSpeaking = false
+    externalJawTarget = null
+}
 
 function updateLipSync(elapsed) {
     if (!headMesh) return
 
     let target = 0
     if (isSpeaking) {
-        const wave = (Math.sin(elapsed * 9) * 0.5 + 0.5) * 0.22
-        target = Math.min(0.08 + wave, 0.35)
+        if (externalJawTarget !== null) {
+            target = externalJawTarget
+        } else {
+            const wave = (Math.sin(elapsed * 9) * 0.5 + 0.5) * 0.22
+            target = Math.min(0.08 + wave, 0.35)
+        }
     }
 
     currentJaw += (target - currentJaw) * 0.25
@@ -429,16 +443,15 @@ let selectedVoice = null
 function loadVoices() {
     const voices = window.speechSynthesis.getVoices()
     selectedVoice = voices.find(v =>
-        v.lang.startsWith('en') && (
-            v.name.includes('Zira') ||
-            v.name.includes('Aria') ||
-            v.name.includes('Jenny') ||
-            v.name.includes('Samantha') ||
-            v.name.includes('Karen') ||
-            v.name.includes('Victoria') ||
+        v.lang.startsWith('de') && (
+            v.name.includes('Katja') ||
+            v.name.includes('Petra') ||
+            v.name.includes('Anna') ||
+            v.name.includes('Helena') ||
+            v.name.includes('Amala') ||
             v.name.toLowerCase().includes('female')
         )
-    ) || voices.find(v => v.lang.startsWith('en'))
+    ) || voices.find(v => v.lang.startsWith('de'))
 }
 
 if ('speechSynthesis' in window) {
@@ -446,11 +459,75 @@ if ('speechSynthesis' in window) {
     window.speechSynthesis.onvoiceschanged = loadVoices
 }
 
-function speak(text) {
-    setSubtitle(text)
+// Vowel-heavy characters open the jaw more than consonants/spaces —
+// a cheap but effective stand-in for real viseme classification.
+const OPEN_CHARS = new Set(["a", "e", "i", "o", "u", "ä", "ö", "ü", "A", "E", "I", "O", "U"])
 
+function driveLipSyncFromAlignment(audio, alignment) {
+    const { characters, character_start_times_seconds } = alignment
+    let frameId
+
+    function frame() {
+        const t = audio.currentTime
+        let idx = -1
+        for (let i = 0; i < character_start_times_seconds.length; i++) {
+            const start = character_start_times_seconds[i]
+            const next = character_start_times_seconds[i + 1] ?? Infinity
+            if (t >= start && t < next) { idx = i; break }
+        }
+
+        const ch = characters[idx] || ""
+        externalJawTarget = OPEN_CHARS.has(ch) ? 0.32 : 0.08
+
+        if (!audio.paused && !audio.ended) {
+            frameId = requestAnimationFrame(frame)
+        }
+    }
+
+    frameId = requestAnimationFrame(frame)
+    return () => cancelAnimationFrame(frameId)
+}
+
+function speakWithElevenLabs(text) {
+    return fetch(TTS_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text })
+    })
+        .then(res => {
+            if (!res.ok) throw new Error("TTS backend returned " + res.status)
+            return res.json()
+        })
+        .then(({ audio_base64, alignment }) => {
+            const audio = new Audio(`data:audio/mpeg;base64,${audio_base64}`)
+
+            return new Promise((resolve, reject) => {
+                let stopDriving = null
+
+                audio.addEventListener("play", () => {
+                    startLipSync()
+                    stopDriving = driveLipSyncFromAlignment(audio, alignment)
+                })
+                audio.addEventListener("ended", () => {
+                    if (stopDriving) stopDriving()
+                    stopLipSync()
+                    setSubtitle("")
+                    resolve()
+                })
+                audio.addEventListener("error", (e) => {
+                    if (stopDriving) stopDriving()
+                    stopLipSync()
+                    reject(e)
+                })
+
+                audio.play().catch(reject)
+            })
+        })
+}
+
+function speakWithBrowserTTS(text) {
     const speech = new SpeechSynthesisUtterance(text)
-    speech.lang = "en-US"
+    speech.lang = "de-DE"
     if (selectedVoice) speech.voice = selectedVoice
 
     speech.onstart = () => startLipSync()
@@ -464,6 +541,17 @@ function speak(text) {
     }
 
     window.speechSynthesis.speak(speech)
+}
+
+async function speak(text) {
+    setSubtitle(text)
+
+    try {
+        await speakWithElevenLabs(text)
+    } catch (err) {
+        console.warn("ElevenLabs TTS unavailable, falling back to browser speech synthesis:", err)
+        speakWithBrowserTTS(text)
+    }
 }
 
 
@@ -495,18 +583,18 @@ function buildChatUI() {
     const input = document.createElement("input")
     input.id = "chat-input"
     input.type = "text"
-    input.placeholder = "Ask me about EAH Jena..."
+    input.placeholder = "Frag mich etwas über die EAH Jena..."
 
     const micBtn = document.createElement("button")
     micBtn.id = "mic-btn"
     micBtn.className = "chat-btn"
     micBtn.textContent = "🎤"
-    micBtn.title = "Ask by voice"
+    micBtn.title = "Per Sprache fragen"
 
     const sendBtn = document.createElement("button")
     sendBtn.id = "send-btn"
     sendBtn.className = "chat-btn"
-    sendBtn.textContent = "Send"
+    sendBtn.textContent = "Senden"
 
     row.appendChild(input)
     row.appendChild(micBtn)
@@ -518,7 +606,7 @@ function buildChatUI() {
     async function handleQuestion(text) {
         if (!text || !text.trim()) return
         input.value = ""
-        setSubtitle("Thinking...")
+        setSubtitle("Einen Moment...")
         const answer = await getAnswer(text)
         speak(answer)
     }
@@ -531,7 +619,7 @@ function buildChatUI() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (SpeechRecognition) {
         const recognition = new SpeechRecognition()
-        recognition.lang = "en-US"
+        recognition.lang = "de-DE"
         recognition.interimResults = false
 
         micBtn.addEventListener("click", () => {
@@ -556,7 +644,7 @@ function buildChatUI() {
         }
     } else {
         micBtn.disabled = true
-        micBtn.title = "Voice input not supported in this browser"
+        micBtn.title = "Spracheingabe wird in diesem Browser nicht unterstützt"
     }
 }
 
