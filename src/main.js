@@ -3,8 +3,30 @@ import './style.css'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm'
 
 import eahLogoUrl from './assets/EAH_Logo.png'
+
+// ======================
+// Character registry
+// ======================
+//
+// Add more characters here as you get more models. "type"决定 which
+// loading/animation code path is used — see loadAvatar() below.
+//
+// glb  → your existing rig: named bones, morphTargetDictionary blendshapes
+// vrm  → VRM avatars (e.g. from VRoid Studio): humanoid bone API,
+//        expressionManager for face — richer expressions out of the box
+
+const AVATAR_CHARACTERS = [
+    {
+        id: 'avatar_1',
+        name: 'EAH Assistant',
+        type: 'glb',
+        path: '/models/Avatar_1.glb',
+        thumbnail: '/thumbnails/Avatar_1.png'
+    }
+]
 
 
 // ======================
@@ -195,7 +217,45 @@ function buildVignette() {
     document.body.appendChild(v)
 }
 
-buildLoadingOverlay()
+function buildCharacterSelectUI(onSelect) {
+    const overlay = document.createElement("div")
+    overlay.id = "character-select-overlay"
+
+    const heading = document.createElement("div")
+    heading.className = "character-select-heading"
+    heading.textContent = "Wähle deinen Assistenten"
+    overlay.appendChild(heading)
+
+    const grid = document.createElement("div")
+    grid.className = "character-select-grid"
+
+    AVATAR_CHARACTERS.forEach((character) => {
+        const card = document.createElement("button")
+        card.className = "character-card"
+
+        const img = document.createElement("img")
+        img.src = character.thumbnail
+        img.alt = character.name
+        img.onerror = () => { img.style.display = "none" } // fine if no thumbnail exists yet
+
+        const label = document.createElement("div")
+        label.className = "character-card-label"
+        label.textContent = character.name
+
+        card.appendChild(img)
+        card.appendChild(label)
+        card.addEventListener("click", () => {
+            overlay.remove()
+            onSelect(character)
+        })
+
+        grid.appendChild(card)
+    })
+
+    overlay.appendChild(grid)
+    document.body.appendChild(overlay)
+}
+
 buildBadge()
 buildVignette()
 
@@ -233,40 +293,103 @@ scene.add(new THREE.AmbientLight(0xffffff, 1))
 // ======================
 
 let currentAvatarRoot = null
+let currentAvatarType = null // 'glb' | 'vrm' — drives every branch below
+let currentVRM = null
+
 let headMesh = null
 let eyelashMesh = null
 let teethLowerMesh = null
 
 const loader = new GLTFLoader()
+loader.register((parser) => new VRMLoaderPlugin(parser)) // harmless no-op on plain GLBs
 
-loader.load(
-    '/models/avatar_1.glb',
-    (gltf) => {
-        currentAvatarRoot = gltf.scene
-        scene.add(gltf.scene)
-        gltf.scene.position.set(0, 0, 0)
-
-        gltf.scene.traverse((obj) => {
-            if (!obj.isMesh) return
-            if (obj.name === 'AvatarHead') headMesh = obj
-            if (obj.name === 'AvatarEyelashes') eyelashMesh = obj
-            if (obj.name === 'AvatarTeethLower') teethLowerMesh = obj
-        })
-
-        setIdlePose(gltf.scene)
-        hideLoadingOverlay()
-        startIdleBlinking()
-
-        setTimeout(() => {
-            triggerBowGesture()
-            speak("Hallo, wie kann ich dir heute helfen? Ich bin der virtuelle Assistent der EAH Jena.")
-        }, 800)
-    },
-    undefined,
-    (error) => {
-        console.error("Avatar loading error:", error)
+function loadAvatar(character) {
+    if (character.type === 'vrm') {
+        loadVRMAvatar(character.path)
+    } else {
+        loadClassicAvatar(character.path)
     }
-)
+}
+
+function loadClassicAvatar(path) {
+    loader.load(
+        path,
+        (gltf) => {
+            currentAvatarRoot = gltf.scene
+            currentAvatarType = 'glb'
+            currentVRM = null
+            scene.add(gltf.scene)
+            gltf.scene.position.set(0, 0, 0)
+
+            gltf.scene.traverse((obj) => {
+                if (!obj.isMesh) return
+                if (obj.name === 'AvatarHead') headMesh = obj
+                if (obj.name === 'AvatarEyelashes') eyelashMesh = obj
+                if (obj.name === 'AvatarTeethLower') teethLowerMesh = obj
+            })
+
+            setIdlePoseGLB(gltf.scene)
+            hideLoadingOverlay()
+            startIdleBlinking()
+
+            setTimeout(() => {
+                triggerBowGesture()
+                speak("Hallo, wie kann ich dir heute helfen? Ich bin der virtuelle Assistent der EAH Jena.")
+            }, 800)
+        },
+        undefined,
+        (error) => {
+            console.error("Avatar loading error:", error)
+        }
+    )
+}
+
+function loadVRMAvatar(path) {
+    loader.load(
+        path,
+        (gltf) => {
+            const vrm = gltf.userData.vrm
+            if (!vrm) {
+                console.error("File loaded but contains no VRM data:", path)
+                return
+            }
+
+            // Older VRM0 exports face backward; VRM1 exports already face
+            // forward. Only flip if this is actually a VRM0 file.
+            if (vrm.meta?.metaVersion === '0') {
+                VRMUtils.rotateVRM0(vrm)
+            }
+
+            currentVRM = vrm
+            currentAvatarRoot = vrm.scene
+            currentAvatarType = 'vrm'
+            headMesh = null
+            eyelashMesh = null
+            teethLowerMesh = null
+
+            scene.add(vrm.scene)
+            vrm.scene.position.set(0, 0, 0)
+
+            setIdlePoseVRM(vrm)
+            hideLoadingOverlay()
+            startIdleBlinking()
+
+            setTimeout(() => {
+                triggerBowGesture()
+                speak("Hallo, wie kann ich dir heute helfen? Ich bin der virtuelle Assistent der EAH Jena.")
+            }, 800)
+        },
+        undefined,
+        (error) => {
+            console.error("VRM avatar loading error:", error)
+        }
+    )
+}
+
+buildCharacterSelectUI((character) => {
+    buildLoadingOverlay()
+    loadAvatar(character)
+})
 
 
 // ======================
@@ -279,7 +402,7 @@ loader.load(
 let idleBones = {}
 let idleBase = {}
 
-function setIdlePose(root) {
+function setIdlePoseGLB(root) {
     const bones = {
         leftUpperArm: root.getObjectByName('LeftArm'),
         rightUpperArm: root.getObjectByName('RightArm'),
@@ -309,6 +432,36 @@ function setIdlePose(root) {
     }
 }
 
+// VRM avatars use a standardized humanoid bone API instead of named bones,
+// so lookups go through vrm.humanoid rather than getObjectByName. VRM's
+// default (VRM1) rest pose already has arms down, unlike this project's
+// GLB rig — so this pose is much lighter-touch; tune to taste once you
+// have a real anime model to test against.
+function setIdlePoseVRM(vrm) {
+    const h = vrm.humanoid
+    if (!h) return
+
+    const bones = {
+        leftUpperArm: h.getNormalizedBoneNode('leftUpperArm'),
+        rightUpperArm: h.getNormalizedBoneNode('rightUpperArm'),
+        leftLowerArm: h.getNormalizedBoneNode('leftLowerArm'),
+        rightLowerArm: h.getNormalizedBoneNode('rightLowerArm'),
+        spine: h.getNormalizedBoneNode('spine')
+    }
+
+    // Small relaxation from the default rest pose — arms slightly forward
+    // rather than stiffly at the sides. Adjust once you can see it live.
+    if (bones.leftUpperArm) bones.leftUpperArm.rotation.z += 0.05
+    if (bones.rightUpperArm) bones.rightUpperArm.rotation.z -= 0.05
+
+    idleBones = bones
+
+    idleBase = {}
+    for (const key in bones) {
+        if (bones[key]) idleBase[key] = bones[key].rotation.clone()
+    }
+}
+
 function applyIdleSway(elapsed) {
     const b = idleBones
     const base = idleBase
@@ -319,6 +472,8 @@ function applyIdleSway(elapsed) {
     if (b.leftLowerArm && base.leftLowerArm) b.leftLowerArm.rotation.y = base.leftLowerArm.y + armSway
     if (b.rightLowerArm && base.rightLowerArm) b.rightLowerArm.rotation.y = base.rightLowerArm.y + armSway
 
+    // Finger sway only exists on the classic rig's bone map — harmless
+    // no-op for VRM, since those keys are simply absent there.
     if (b.leftIndexProximal) b.leftIndexProximal.rotation.x = 0.05 + Math.sin(elapsed * 0.7) * 0.03
     if (b.rightIndexProximal) b.rightIndexProximal.rotation.x = 0.05 + Math.sin(elapsed * 0.72 + 2.4) * 0.03
     if (b.leftMiddleProximal) b.leftMiddleProximal.rotation.x = 0.05 + Math.sin(elapsed * 0.65 + 1) * 0.03
@@ -383,6 +538,11 @@ function setMorph(meshes, name, value) {
 }
 
 function startIdleBlinking() {
+    if (currentAvatarType === 'vrm') {
+        startIdleBlinkingVRM()
+        return
+    }
+
     if (!headMesh && !eyelashMesh) return
     const faces = [headMesh, eyelashMesh]
 
@@ -394,6 +554,26 @@ function startIdleBlinking() {
             setTimeout(() => {
                 setMorph(faces, "eyeBlinkLeft", 0)
                 setMorph(faces, "eyeBlinkRight", 0)
+                blinkLoop()
+            }, 150)
+        }, nextBlinkIn)
+    }
+    blinkLoop()
+}
+
+// VRM's expressionManager exposes standard presets by name ('blink',
+// 'happy', 'angry', 'sad', 'surprised', etc.) — this is the richer
+// expression system VRM avatars are chosen for in the first place.
+function startIdleBlinkingVRM() {
+    if (!currentVRM?.expressionManager) return
+    const em = currentVRM.expressionManager
+
+    function blinkLoop() {
+        const nextBlinkIn = 2000 + Math.random() * 4000
+        setTimeout(() => {
+            em.setValue('blink', 1)
+            setTimeout(() => {
+                em.setValue('blink', 0)
                 blinkLoop()
             }, 150)
         }, nextBlinkIn)
@@ -421,21 +601,38 @@ function stopLipSync() {
     externalJawTarget = null
 }
 
-function updateLipSync(elapsed) {
-    if (!headMesh) return
+// Shared target computation — 0..~0.35 range, same scale your GLB rig's
+// jawOpen blendshape always used. VRM's expressionManager expects roughly
+// 0..1, so the VRM branch below rescales it rather than duplicating logic.
+function computeMouthTarget(elapsed) {
+    if (!isSpeaking) return 0
+    if (externalJawTarget !== null) return externalJawTarget
 
-    let target = 0
-    if (isSpeaking) {
-        if (externalJawTarget !== null) {
-            target = externalJawTarget
-        } else {
-            const wave = (Math.sin(elapsed * 9) * 0.5 + 0.5) * 0.22
-            target = Math.min(0.08 + wave, 0.35)
-        }
+    const wave = (Math.sin(elapsed * 9) * 0.5 + 0.5) * 0.22
+    return Math.min(0.08 + wave, 0.35)
+}
+
+function updateLipSync(elapsed) {
+    if (currentAvatarType === 'vrm') {
+        updateLipSyncVRM(elapsed)
+        return
     }
 
+    if (!headMesh) return
+
+    const target = computeMouthTarget(elapsed)
     currentJaw += (target - currentJaw) * 0.25
     setMorph([headMesh, teethLowerMesh], "jawOpen", currentJaw)
+}
+
+let currentVRMMouth = 0
+
+function updateLipSyncVRM(elapsed) {
+    if (!currentVRM?.expressionManager) return
+
+    const target = computeMouthTarget(elapsed) / 0.35 // rescale to ~0..1
+    currentVRMMouth += (target - currentVRMMouth) * 0.25
+    currentVRM.expressionManager.setValue('aa', currentVRMMouth)
 }
 
 let selectedVoice = null
@@ -659,6 +856,7 @@ const clock = new THREE.Clock()
 
 function animate() {
     requestAnimationFrame(animate)
+    const delta = clock.getDelta()
     const elapsed = clock.getElapsedTime()
 
     if (currentAvatarRoot) {
@@ -666,6 +864,12 @@ function animate() {
         applyActiveGesture()
         updateLipSync(elapsed)
         currentAvatarRoot.position.y = Math.sin(Date.now() * 0.0015) * 0.005
+    }
+
+    // Required for VRM spring-bone physics (hair/clothing) and look-at to
+    // update — plain GLB avatars have no equivalent step, hence the guard.
+    if (currentVRM) {
+        currentVRM.update(delta)
     }
 
     renderer.render(scene, camera)
