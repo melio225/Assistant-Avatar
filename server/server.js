@@ -14,13 +14,23 @@ if (!apiKey) {
 const mistral = new Mistral({ apiKey })
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY
-const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID
+
+// One ElevenLabs voice per avatar character. The frontend sends which
+// avatar is active as `voice` in the /api/tts request body; unknown or
+// missing values fall back to the EAH voice.
+const ELEVENLABS_VOICE_IDS = {
+    eah: process.env.ELEVENLABS_VOICE_ID_EAH,
+    anime: process.env.ELEVENLABS_VOICE_ID_ANIME
+}
 
 if (!ELEVENLABS_API_KEY) {
     console.warn("WARNING: ELEVENLABS_API_KEY is missing — /api/tts will fail until it's set")
 }
-if (!ELEVENLABS_VOICE_ID) {
-    console.warn("WARNING: ELEVENLABS_VOICE_ID is missing — /api/tts will fail until it's set")
+if (!ELEVENLABS_VOICE_IDS.eah) {
+    console.warn("WARNING: ELEVENLABS_VOICE_ID_EAH is missing — /api/tts will fail for the EAH avatar until it's set")
+}
+if (!ELEVENLABS_VOICE_IDS.anime) {
+    console.warn("WARNING: ELEVENLABS_VOICE_ID_ANIME is missing — /api/tts will fail for the anime avatar until it's set")
 }
 
 const app = express()
@@ -92,14 +102,20 @@ app.post("/api/chat", async (req, res) => {
 
 app.post("/api/tts", async (req, res) => {
     try {
-        const { text } = req.body
+        const { text, voice } = req.body
 
         if (!text || typeof text !== "string") {
             return res.status(400).json({ error: "Missing text" })
         }
 
+        const voiceId = ELEVENLABS_VOICE_IDS[voice] || ELEVENLABS_VOICE_IDS.eah
+
+        if (!voiceId) {
+            return res.status(500).json({ error: "No ElevenLabs voice ID configured" })
+        }
+
         const elevenRes = await fetch(
-            `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}/with-timestamps`,
+            `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps`,
             {
                 method: "POST",
                 headers: {

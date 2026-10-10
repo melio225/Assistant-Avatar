@@ -24,7 +24,17 @@ const AVATAR_CHARACTERS = [
         name: 'EAH Assistant',
         type: 'glb',
         path: '/models/Avatar_1.glb',
-        thumbnail: '/thumbnails/Avatar_1.png'
+        thumbnail: '/thumbnails/Avatar_1.png',
+        // Matches the key the backend looks up in ELEVENLABS_VOICE_IDS.
+        voice: 'eah'
+    },
+    {
+        id: 'avatar_4',
+        name: 'Anime Assistant',
+        type: 'vrm',
+        path: '/models/Avatar_4.vrm',
+        thumbnail: '/thumbnails/Avatar_4.png',
+        voice: 'anime'
     }
 ]
 
@@ -295,6 +305,7 @@ scene.add(new THREE.AmbientLight(0xffffff, 1))
 let currentAvatarRoot = null
 let currentAvatarType = null // 'glb' | 'vrm' — drives every branch below
 let currentVRM = null
+let currentAvatarVoice = 'eah' // sent to /api/tts so the backend picks the matching ElevenLabs voice
 
 let headMesh = null
 let eyelashMesh = null
@@ -304,6 +315,7 @@ const loader = new GLTFLoader()
 loader.register((parser) => new VRMLoaderPlugin(parser)) // harmless no-op on plain GLBs
 
 function loadAvatar(character) {
+    currentAvatarVoice = character.voice || 'eah'
     if (character.type === 'vrm') {
         loadVRMAvatar(character.path)
     } else {
@@ -433,10 +445,12 @@ function setIdlePoseGLB(root) {
 }
 
 // VRM avatars use a standardized humanoid bone API instead of named bones,
-// so lookups go through vrm.humanoid rather than getObjectByName. VRM's
-// default (VRM1) rest pose already has arms down, unlike this project's
-// GLB rig — so this pose is much lighter-touch; tune to taste once you
-// have a real anime model to test against.
+// so lookups go through vrm.humanoid rather than getObjectByName. By the
+// VRM spec, the humanoid rest pose is a T-pose (arms out horizontally) —
+// it is NOT already arms-down like this project's GLB rig. So we have to
+// actively rotate the upper arms down into a relaxed pose, same as any
+// other VRM idle-pose setup. -75°/+75° is a common starting point; tune
+// per-model if the shoulders look pinned or the arms clip the torso.
 function setIdlePoseVRM(vrm) {
     const h = vrm.humanoid
     if (!h) return
@@ -449,10 +463,16 @@ function setIdlePoseVRM(vrm) {
         spine: h.getNormalizedBoneNode('spine')
     }
 
-    // Small relaxation from the default rest pose — arms slightly forward
-    // rather than stiffly at the sides. Adjust once you can see it live.
-    if (bones.leftUpperArm) bones.leftUpperArm.rotation.z += 0.05
-    if (bones.rightUpperArm) bones.rightUpperArm.rotation.z -= 0.05
+    const DEG = THREE.MathUtils.degToRad
+
+    // Bring arms down from the T-pose rest pose into a relaxed A-pose —
+    // slightly short of straight down (58° rather than 75°) so the hands
+    // clear the skirt/hip geometry instead of clipping into it.
+    if (bones.leftUpperArm) bones.leftUpperArm.rotation.z = DEG(58)
+    if (bones.rightUpperArm) bones.rightUpperArm.rotation.z = DEG(-58)
+    // Slight elbow bend so the arms don't look ruler-straight.
+    if (bones.leftLowerArm) bones.leftLowerArm.rotation.z = DEG(8)
+    if (bones.rightLowerArm) bones.rightLowerArm.rotation.z = DEG(-8)
 
     idleBones = bones
 
@@ -517,7 +537,12 @@ function applyActiveGesture() {
         const eased = lift * lift * (3 - 2 * lift)
 
         if (idleBones.spine && idleBase.spine) {
-            idleBones.spine.rotation.x = idleBase.spine.x + eased * 0.35
+            // The GLB rig's named Spine bone and the VRM humanoid's
+            // normalized spine bone rotate in opposite directions for the
+            // same "bow forward" intent — flip the sign for VRM so it
+            // doesn't bow backward.
+            const bowSign = currentAvatarType === 'vrm' ? -1 : 1
+            idleBones.spine.rotation.x = idleBase.spine.x + bowSign * eased * 0.35
         }
     }
 }
@@ -689,7 +714,7 @@ function speakWithElevenLabs(text) {
     return fetch(TTS_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text, voice: currentAvatarVoice })
     })
         .then(res => {
             if (!res.ok) throw new Error("TTS backend returned " + res.status)
