@@ -25,3 +25,4 @@ dist-ssr
 ".env" 
 "server/.env" 
 ".env" 
+server/.env
