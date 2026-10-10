@@ -96,7 +96,8 @@ function findAnswer(question) {
 // frontend and backend share a domain — requests then go to /api/... on
 // the same origin, so no CORS is involved.
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001"
+// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001"
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001"
 const CHAT_ENDPOINT = `${API_BASE_URL}/api/chat`
 const TTS_ENDPOINT = `${API_BASE_URL}/api/tts`
 
