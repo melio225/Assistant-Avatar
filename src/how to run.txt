@@ -2,8 +2,4 @@
 1- npm install @mistralai/mistralai
 2- npm run dev / npm start
 
-Backend:
-https://assistant-avatar.onrender.com
 
-Frontend:
-https://assistant-avatar-eddi.vercel.app
