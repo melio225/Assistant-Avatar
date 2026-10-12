@@ -21,7 +21,7 @@ import eahLogoUrl from './assets/EAH_Logo.png'
 const AVATAR_CHARACTERS = [
     {
         id: 'avatar_1',
-        name: 'EAH Assistant',
+        name: 'Elena',
         type: 'glb',
         path: '/models/Avatar_1.glb',
         thumbnail: '/thumbnails/Avatar_1.png',
@@ -30,7 +30,7 @@ const AVATAR_CHARACTERS = [
     },
     {
         id: 'avatar_4',
-        name: 'Anime Assistant',
+        name: 'MIKA',
         type: 'vrm',
         path: '/models/Avatar_4.vrm',
         thumbnail: '/thumbnails/Avatar_4.png',
