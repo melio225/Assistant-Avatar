@@ -5,13 +5,70 @@ import dotenv from "dotenv"
 
 dotenv.config()
 
-const apiKey = process.env.MISTRAL_API_KEY
+// ======================
+// Language model provider
+// ======================
+//
+// Default: Mistral (needs MISTRAL_API_KEY).
+// To use any OpenAI-compatible provider instead (Google Gemini, Groq, ...),
+// set all three of these in .env — no code change needed:
+//   LLM_BASE_URL  e.g. https://generativelanguage.googleapis.com/v1beta/openai
+//   LLM_API_KEY   the provider's API key
+//   LLM_MODEL     e.g. gemini-2.5-flash
+// Remove LLM_BASE_URL to go back to Mistral.
 
-if (!apiKey) {
-    console.error("ERROR: MISTRAL_API_KEY is missing from your .env file")
+const LLM_BASE_URL = process.env.LLM_BASE_URL
+const LLM_API_KEY = process.env.LLM_API_KEY
+const LLM_MODEL = process.env.LLM_MODEL
+
+const mistralKey = process.env.MISTRAL_API_KEY
+const mistral = mistralKey ? new Mistral({ apiKey: mistralKey }) : null
+
+if (LLM_BASE_URL) {
+    if (!LLM_API_KEY || !LLM_MODEL) {
+        console.error("ERROR: LLM_BASE_URL is set, but LLM_API_KEY or LLM_MODEL is missing in .env")
+    } else {
+        console.log(`Using OpenAI-compatible provider: ${LLM_BASE_URL} (model: ${LLM_MODEL})`)
+    }
+} else if (!mistralKey) {
+    console.error("ERROR: MISTRAL_API_KEY is missing from your .env file (or set LLM_BASE_URL, LLM_API_KEY and LLM_MODEL)")
+} else {
+    console.log("Using Mistral (mistral-small-latest)")
 }
 
-const mistral = new Mistral({ apiKey })
+async function getCompletion(messages) {
+    if (LLM_BASE_URL) {
+        const r = await fetch(`${LLM_BASE_URL.replace(/\/$/, "")}/chat/completions`, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${LLM_API_KEY}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ model: LLM_MODEL, messages })
+        })
+
+        if (!r.ok) {
+            throw new Error(`LLM provider error ${r.status}: ${await r.text()}`)
+        }
+
+        const data = await r.json()
+        return data.choices[0].message.content
+    }
+
+    if (!mistral) {
+        throw new Error("No language model configured")
+    }
+
+    const response = await mistral.chat.complete({
+        model: "mistral-small-latest",
+        messages
+    })
+    return response.choices[0].message.content
+}
+
+// ======================
+// Text-to-speech configuration
+// ======================
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY
 
@@ -107,16 +164,12 @@ app.post("/api/chat", async (req, res) => {
             { role: "user", content: question }
         ]
 
-        const response = await mistral.chat.complete({
-            model: "mistral-small-latest",
-            messages
-        })
-
-        res.json({ answer: response.choices[0].message.content })
+        const answer = await getCompletion(messages)
+        res.json({ answer })
 
     } catch (err) {
-        console.error("Mistral API error:", err)
-        res.status(500).json({ error: "Something went wrong talking to Mistral." })
+        console.error("Language model error:", err)
+        res.status(500).json({ error: "Something went wrong talking to the language model." })
     }
 })
 
