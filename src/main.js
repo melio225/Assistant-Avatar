@@ -11,7 +11,7 @@ import eahLogoUrl from './assets/EAH_Logo.png'
 // Character registry
 // ======================
 //
-// Add more characters here as you get more models. "type"决定 which
+// Add more characters here as you get more models. "type" decides which
 // loading/animation code path is used — see loadAvatar() below.
 //
 // glb  → your existing rig: named bones, morphTargetDictionary blendshapes
@@ -30,13 +30,61 @@ const AVATAR_CHARACTERS = [
     },
     {
         id: 'avatar_4',
-        name: 'MIKA',
+        name: 'Mika',
         type: 'vrm',
         path: '/models/Avatar_4.vrm',
         thumbnail: '/thumbnails/Avatar_4.png',
         voice: 'anime'
     }
 ]
+
+
+// ======================
+// Languages
+// ======================
+//
+// The language is chosen on the start screen (required) and then used for
+// every UI text, the speech recognition, the browser voice fallback, the
+// offline FAQ, and is sent to the backend for chat + text-to-speech.
+// To add a language: add an entry here, one option in the start screen,
+// and a system prompt in server/server.js.
+
+let currentLanguage = null // 'de' | 'en' — set on the start screen
+
+const I18N = {
+    de: {
+        speechLang: 'de-DE',
+        heading: 'Wähle deinen Assistenten',
+        langLabel: 'Sprache',
+        loading: 'Assistent wird geladen...',
+        badgeSub: 'Virtueller Campus-Assistent',
+        greeting: 'Hallo, wie kann ich dir heute helfen? Ich bin der virtuelle Assistent der EAH Jena.',
+        placeholder: 'Frag mich etwas über die EAH Jena...',
+        send: 'Senden',
+        thinking: 'Einen Moment...',
+        micTitle: 'Per Sprache fragen',
+        micUnsupported: 'Spracheingabe wird in diesem Browser nicht unterstützt',
+        fallback: 'Das ist eine gute Frage — dazu habe ich noch keine Angabe, aber ich empfehle, auf eah-jena.de nachzuschauen oder das Studierendensekretariat zu fragen.'
+    },
+    en: {
+        speechLang: 'en-US',
+        heading: 'Choose your assistant',
+        langLabel: 'Language',
+        loading: 'Loading assistant...',
+        badgeSub: 'Virtual Campus Assistant',
+        greeting: "Hello, how can I help you today? I'm the virtual assistant of EAH Jena.",
+        placeholder: 'Ask me something about EAH Jena...',
+        send: 'Send',
+        thinking: 'One moment...',
+        micTitle: 'Ask by voice',
+        micUnsupported: 'Voice input is not supported in this browser',
+        fallback: "That's a good question, but I don't have information on it yet. Please check eah-jena.de or ask the student office."
+    }
+}
+
+function t(key) {
+    return I18N[currentLanguage || 'de'][key]
+}
 
 
 // ======================
@@ -74,17 +122,46 @@ const KNOWLEDGE_BASE = [
     }
 ]
 
-const FALLBACK_ANSWER =
-    "Das ist eine gute Frage — dazu habe ich noch keine Angabe, aber ich empfehle, auf eah-jena.de nachzuschauen oder das Studierendensekretariat zu fragen."
+const KNOWLEDGE_BASE_EN = [
+    {
+        keywords: ["who are you", "what is eah", "about eah", "which university", "welcome"],
+        answer: "I'm the virtual assistant of Ernst-Abbe-Hochschule Jena, or EAH Jena for short. We are a university of applied sciences in Jena, founded in 1991, with around 4,200 students."
+    },
+    {
+        keywords: ["study", "program", "programme", "course", "degree", "faculty", "faculties", "subject"],
+        answer: "EAH Jena offers around fifty bachelor's and master's programs in four areas: technology, business, social work and health. Examples include electrical engineering, mechanical engineering, medical engineering, biotechnology, business administration, and health and nursing."
+    },
+    {
+        keywords: ["where", "location", "address", "campus"],
+        answer: "Our campus is on Carl-Zeiss-Promenade in Jena, in the state of Thuringia."
+    },
+    {
+        keywords: ["admission", "apply", "application", "deadline", "enroll", "enrol"],
+        answer: "Most of our programs have no admission restrictions, and many are free of tuition fees. Application deadlines are usually July 15 for the winter semester and February 15 for the summer semester. You'll find exact dates on each program's page."
+    },
+    {
+        keywords: ["history", "founded", "when was", "ernst abbe"],
+        answer: "The university was founded in 1991 and has been named Ernst-Abbe-Hochschule since 2014, after Ernst Abbe, a researcher, entrepreneur and social reformer from Jena's Zeiss and science tradition."
+    },
+    {
+        keywords: ["hello", "hi", "good morning", "good afternoon"],
+        answer: "Hello! Welcome to EAH Jena. What would you like to know?"
+    },
+    {
+        keywords: ["thank", "thanks"],
+        answer: "You're welcome! Let me know if you want to know anything else about EAH Jena."
+    }
+]
 
 function findAnswer(question) {
     const q = question.toLowerCase()
-    for (const entry of KNOWLEDGE_BASE) {
+    const base = currentLanguage === 'en' ? KNOWLEDGE_BASE_EN : KNOWLEDGE_BASE
+    for (const entry of base) {
         if (entry.keywords.some(k => q.includes(k))) {
             return entry.answer
         }
     }
-    return FALLBACK_ANSWER
+    return t('fallback')
 }
 
 
@@ -108,7 +185,11 @@ async function getAnswer(question) {
         const response = await fetch(CHAT_ENDPOINT, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ question, history: conversationHistory })
+            body: JSON.stringify({
+                question,
+                history: conversationHistory,
+                language: currentLanguage
+            })
         })
 
         if (!response.ok) throw new Error("Backend returned " + response.status)
@@ -183,7 +264,7 @@ function buildLoadingOverlay() {
 
     const text = document.createElement("div")
     text.className = "loading-text"
-    text.textContent = "Assistent wird geladen..."
+    text.textContent = t('loading')
 
     overlay.appendChild(spinner)
     overlay.appendChild(text)
@@ -213,7 +294,7 @@ function buildBadge() {
 
     const sub = document.createElement("div")
     sub.className = "badge-sub"
-    sub.textContent = "Virtueller Campus-Assistent"
+    sub.textContent = t('badgeSub')
 
     textCol.appendChild(title)
     textCol.appendChild(sub)
@@ -228,14 +309,44 @@ function buildVignette() {
     document.body.appendChild(v)
 }
 
+// Start screen: language (required dropdown) + avatar (name buttons with
+// picture). Avatars stay locked until a language is chosen; clicking a
+// locked avatar highlights the dropdown instead of doing nothing.
 function buildCharacterSelectUI(onSelect) {
     const overlay = document.createElement("div")
     overlay.id = "character-select-overlay"
+    overlay.classList.add("locked")
+
+    const langLabel = document.createElement("label")
+    langLabel.className = "language-label"
+    langLabel.htmlFor = "language-select"
+    langLabel.textContent = "Language / Sprache"
+
+    const select = document.createElement("select")
+    select.id = "language-select"
+    select.className = "language-select"
+    select.required = true
+
+    const placeholder = document.createElement("option")
+    placeholder.value = ""
+    placeholder.textContent = "Choose / Wählen …"
+    placeholder.disabled = true
+    placeholder.selected = true
+    select.appendChild(placeholder)
+
+    ;[
+        { value: "en", label: "English" },
+        { value: "de", label: "Deutsch" }
+    ].forEach(({ value, label }) => {
+        const option = document.createElement("option")
+        option.value = value
+        option.textContent = label
+        select.appendChild(option)
+    })
 
     const heading = document.createElement("div")
     heading.className = "character-select-heading"
-    heading.textContent = "Wähle deinen Assistenten"
-    overlay.appendChild(heading)
+    heading.textContent = "Avatar"
 
     const grid = document.createElement("div")
     grid.className = "character-select-grid"
@@ -243,6 +354,7 @@ function buildCharacterSelectUI(onSelect) {
     AVATAR_CHARACTERS.forEach((character) => {
         const card = document.createElement("button")
         card.className = "character-card"
+        card.type = "button"
 
         const img = document.createElement("img")
         img.src = character.thumbnail
@@ -256,13 +368,29 @@ function buildCharacterSelectUI(onSelect) {
         card.appendChild(img)
         card.appendChild(label)
         card.addEventListener("click", () => {
+            if (!select.value) {
+                select.classList.add("needs-choice")
+                select.focus()
+                return
+            }
             overlay.remove()
-            onSelect(character)
+            onSelect(character, select.value)
         })
 
         grid.appendChild(card)
     })
 
+    select.addEventListener("change", () => {
+        const texts = I18N[select.value]
+        langLabel.textContent = texts.langLabel
+        heading.textContent = texts.heading
+        select.classList.remove("needs-choice")
+        overlay.classList.remove("locked")
+    })
+
+    overlay.appendChild(langLabel)
+    overlay.appendChild(select)
+    overlay.appendChild(heading)
     overlay.appendChild(grid)
     document.body.appendChild(overlay)
 }
@@ -347,7 +475,7 @@ function loadClassicAvatar(path) {
 
             setTimeout(() => {
                 triggerBowGesture()
-                speak("Hallo, wie kann ich dir heute helfen? Ich bin der virtuelle Assistent der EAH Jena.")
+                speak(t('greeting'))
             }, 800)
         },
         undefined,
@@ -389,7 +517,7 @@ function loadVRMAvatar(path) {
 
             setTimeout(() => {
                 triggerBowGesture()
-                speak("Hallo, wie kann ich dir heute helfen? Ich bin der virtuelle Assistent der EAH Jena.")
+                speak(t('greeting'))
             }, 800)
         },
         undefined,
@@ -399,8 +527,17 @@ function loadVRMAvatar(path) {
     )
 }
 
-buildCharacterSelectUI((character) => {
+// Start flow: choose language + avatar → build the language-specific UI →
+// load the chosen avatar. The chat UI is built here (not at page load) so
+// that every text is created in the chosen language.
+buildCharacterSelectUI((character, language) => {
+    currentLanguage = language
+
+    const badgeSub = document.querySelector('.badge-sub')
+    if (badgeSub) badgeSub.textContent = t('badgeSub')
+
     buildLoadingOverlay()
+    buildChatUI()
     loadAvatar(character)
 })
 
@@ -661,25 +798,23 @@ function updateLipSyncVRM(elapsed) {
     currentVRM.expressionManager.setValue('aa', currentVRMMouth)
 }
 
-let selectedVoice = null
-
-function loadVoices() {
-    const voices = window.speechSynthesis.getVoices()
-    selectedVoice = voices.find(v =>
-        v.lang.startsWith('de') && (
-            v.name.includes('Katja') ||
-            v.name.includes('Petra') ||
-            v.name.includes('Anna') ||
-            v.name.includes('Helena') ||
-            v.name.includes('Amala') ||
-            v.name.toLowerCase().includes('female')
-        )
-    ) || voices.find(v => v.lang.startsWith('de'))
+// Browser-voice fallback: pick a voice that matches the chosen language.
+function pickVoice() {
+    if (!('speechSynthesis' in window)) return null
+    const prefix = currentLanguage === 'en' ? 'en' : 'de'
+    const voices = window.speechSynthesis.getVoices().filter(v => v.lang.startsWith(prefix))
+    return (
+        voices.find(v => /female|katja|petra|anna|helena|amala|zira|jenny|samantha/i.test(v.name)) ||
+        voices[0] ||
+        null
+    )
 }
 
 if ('speechSynthesis' in window) {
-    loadVoices()
-    window.speechSynthesis.onvoiceschanged = loadVoices
+    // Some browsers load the voice list asynchronously; touching it early
+    // makes sure it is ready by the time the fallback is needed.
+    window.speechSynthesis.getVoices()
+    window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices()
 }
 
 // Vowel-heavy characters open the jaw more than consonants/spaces —
@@ -715,7 +850,11 @@ function speakWithElevenLabs(text) {
     return fetch(TTS_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice: currentAvatarVoice })
+        body: JSON.stringify({
+            text,
+            voice: currentAvatarVoice,
+            language: currentLanguage
+        })
     })
         .then(res => {
             if (!res.ok) throw new Error("TTS backend returned " + res.status)
@@ -750,8 +889,10 @@ function speakWithElevenLabs(text) {
 
 function speakWithBrowserTTS(text) {
     const speech = new SpeechSynthesisUtterance(text)
-    speech.lang = "de-DE"
-    if (selectedVoice) speech.voice = selectedVoice
+    speech.lang = t('speechLang')
+
+    const voice = pickVoice()
+    if (voice) speech.voice = voice
 
     speech.onstart = () => startLipSync()
     speech.onend = () => {
@@ -806,18 +947,18 @@ function buildChatUI() {
     const input = document.createElement("input")
     input.id = "chat-input"
     input.type = "text"
-    input.placeholder = "Frag mich etwas über die EAH Jena..."
+    input.placeholder = t('placeholder')
 
     const micBtn = document.createElement("button")
     micBtn.id = "mic-btn"
     micBtn.className = "chat-btn"
     micBtn.textContent = "🎤"
-    micBtn.title = "Per Sprache fragen"
+    micBtn.title = t('micTitle')
 
     const sendBtn = document.createElement("button")
     sendBtn.id = "send-btn"
     sendBtn.className = "chat-btn"
-    sendBtn.textContent = "Senden"
+    sendBtn.textContent = t('send')
 
     row.appendChild(input)
     row.appendChild(micBtn)
@@ -829,7 +970,7 @@ function buildChatUI() {
     async function handleQuestion(text) {
         if (!text || !text.trim()) return
         input.value = ""
-        setSubtitle("Einen Moment...")
+        setSubtitle(t('thinking'))
         const answer = await getAnswer(text)
         speak(answer)
     }
@@ -842,7 +983,7 @@ function buildChatUI() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (SpeechRecognition) {
         const recognition = new SpeechRecognition()
-        recognition.lang = "de-DE"
+        recognition.lang = t('speechLang')
         recognition.interimResults = false
 
         micBtn.addEventListener("click", () => {
@@ -867,11 +1008,9 @@ function buildChatUI() {
         }
     } else {
         micBtn.disabled = true
-        micBtn.title = "Spracheingabe wird in diesem Browser nicht unterstützt"
+        micBtn.title = t('micUnsupported')
     }
 }
-
-buildChatUI()
 
 
 // ======================

@@ -1,5 +1,9 @@
-#this is how to run website:
+# this is how to run website:
 1- npm install @mistralai/mistralai
 2- npm run dev / npm start
 
+# this is how to run website 2:
+cd ~/Assistant-Avatar
+npm run build
+sudo cp -r dist/* /var/www/avatar/
 

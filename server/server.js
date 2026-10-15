@@ -41,7 +41,10 @@ const app = express()
 app.use(cors({ origin: process.env.FRONTEND_URL || "*" }))
 app.use(express.json())
 
-const SYSTEM_PROMPT = `Du bist der virtuelle Assistent-Avatar der Ernst-Abbe-Hochschule Jena (EAH Jena), einer Hochschule für angewandte Wissenschaften in Jena, Deutschland.
+// One system prompt per supported language. The frontend sends
+// `language` ("de" or "en") with every chat and TTS request.
+const SYSTEM_PROMPTS = {
+    de: `Du bist der virtuelle Assistent-Avatar der Ernst-Abbe-Hochschule Jena (EAH Jena), einer Hochschule für angewandte Wissenschaften in Jena, Deutschland.
 
 Antworte immer auf Deutsch, auch wenn die Frage auf Englisch gestellt wird.
 
@@ -56,7 +59,30 @@ Fakten, auf die du dich verlassen kannst:
 Richtlinien:
 - Halte Antworten kurz und gut vorlesbar (2-4 Sätze), da sie per Text-to-Speech vorgelesen werden.
 - Sei freundlich und einladend, wie ein Campusführer.
-- Wenn du ein bestimmtes Detail nicht kennst, sag das ehrlich und empfiehl, auf eah-jena.de nachzuschauen, statt zu raten.`
+- Wenn du ein bestimmtes Detail nicht kennst, sag das ehrlich und empfiehl, auf eah-jena.de nachzuschauen, statt zu raten.`,
+
+    en: `You are the virtual assistant avatar of Ernst-Abbe-Hochschule Jena (EAH Jena), a university of applied sciences in Jena, Germany.
+
+Always answer in English, even if the question is asked in German.
+
+Facts you can rely on:
+- Founded in 1991, named Ernst-Abbe-Hochschule since 2014 after Ernst Abbe.
+- Around 4,200 students.
+- Campus on Carl-Zeiss-Promenade in Jena, Thuringia.
+- About 50 bachelor's and master's programs in four areas: technology, business, social work and health.
+- Most programs have no admission restrictions; many are also free of tuition fees.
+- Usual application deadlines: July 15 (winter semester), February 15 (summer semester).
+
+Guidelines:
+- Keep answers short and easy to read aloud (2-4 sentences), since they are spoken by text-to-speech.
+- Be friendly and welcoming, like a campus guide.
+- If you don't know a specific detail, say so honestly and recommend checking eah-jena.de instead of guessing.`
+}
+
+// Anything unknown or missing falls back to German.
+function normalizeLanguage(language) {
+    return language === "en" ? "en" : "de"
+}
 
 app.get("/", (req, res) => {
     res.send("EAH Jena assistant backend is running.")
@@ -64,14 +90,16 @@ app.get("/", (req, res) => {
 
 app.post("/api/chat", async (req, res) => {
     try {
-        const { question, history = [] } = req.body
+        const { question, history = [], language } = req.body
 
         if (!question || typeof question !== "string") {
             return res.status(400).json({ error: "Missing question" })
         }
 
+        const lang = normalizeLanguage(language)
+
         const messages = [
-            { role: "system", content: SYSTEM_PROMPT },
+            { role: "system", content: SYSTEM_PROMPTS[lang] },
             ...history.map(turn => ({
                 role: turn.role === "assistant" ? "assistant" : "user",
                 content: turn.content
@@ -102,12 +130,13 @@ app.post("/api/chat", async (req, res) => {
 
 app.post("/api/tts", async (req, res) => {
     try {
-        const { text, voice } = req.body
+        const { text, voice, language } = req.body
 
         if (!text || typeof text !== "string") {
             return res.status(400).json({ error: "Missing text" })
         }
 
+        const lang = normalizeLanguage(language)
         const voiceId = ELEVENLABS_VOICE_IDS[voice] || ELEVENLABS_VOICE_IDS.eah
 
         if (!voiceId) {
@@ -124,7 +153,10 @@ app.post("/api/tts", async (req, res) => {
                 },
                 body: JSON.stringify({
                     text,
-                    model_id: "eleven_flash_v2_5"
+                    model_id: "eleven_flash_v2_5",
+                    // Tells the multilingual model which language to speak,
+                    // so English text isn't read with a German accent.
+                    language_code: lang
                 })
             }
         )
