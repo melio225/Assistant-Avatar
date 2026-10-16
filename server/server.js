@@ -2,6 +2,9 @@ import express from "express"
 import cors from "cors"
 import { Mistral } from "@mistralai/mistralai"
 import dotenv from "dotenv"
+import fs from "fs"
+import path from "path"
+import { fileURLToPath } from "url"
 
 dotenv.config()
 
@@ -141,6 +144,55 @@ function normalizeLanguage(language) {
     return language === "en" ? "en" : "de"
 }
 
+// ======================
+// Extra knowledge (server/knowledge.md)
+// ======================
+//
+// Facts the assistant may use beyond the short list in the system prompt.
+// Edit server/knowledge.md and the change is picked up on the next
+// question — no restart needed. Lines starting with // are comments and
+// are not sent to the model. Keep it to verified facts, and never put
+// personal data in it.
+
+const KNOWLEDGE_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), "knowledge.md")
+const KNOWLEDGE_MAX_CHARS = 20000
+
+let knowledgeCache = { mtime: 0, text: "" }
+
+function getKnowledge() {
+    try {
+        const stat = fs.statSync(KNOWLEDGE_FILE)
+        if (stat.mtimeMs !== knowledgeCache.mtime) {
+            let text = fs.readFileSync(KNOWLEDGE_FILE, "utf8")
+                .split(/\r?\n/)
+                .filter(line => !line.trim().startsWith("//"))
+                .join("\n")
+                .trim()
+
+            if (text.length > KNOWLEDGE_MAX_CHARS) {
+                console.warn(`WARNING: knowledge.md is longer than ${KNOWLEDGE_MAX_CHARS} characters and was shortened`)
+                text = text.slice(0, KNOWLEDGE_MAX_CHARS)
+            }
+            knowledgeCache = { mtime: stat.mtimeMs, text }
+            console.log(`Loaded knowledge.md (${text.length} characters)`)
+        }
+        return knowledgeCache.text
+    } catch {
+        return "" // no knowledge file is fine
+    }
+}
+
+const KNOWLEDGE_INTRO = {
+    de: "Zusätzliches, geprüftes Wissen (die Quelle ist deutsch; antworte in der Sprache der Unterhaltung). Was hier und oben nicht steht, darfst du nicht erfinden:",
+    en: "Additional verified knowledge (the source is in German; answer in the language of the conversation). Do not invent anything that is not stated here or above:"
+}
+
+function buildSystemPrompt(lang) {
+    const knowledge = getKnowledge()
+    if (!knowledge) return SYSTEM_PROMPTS[lang]
+    return `${SYSTEM_PROMPTS[lang]}\n\n${KNOWLEDGE_INTRO[lang]}\n\n${knowledge}`
+}
+
 app.get("/", (req, res) => {
     res.send("EAH Jena assistant backend is running.")
 })
@@ -156,7 +208,7 @@ app.post("/api/chat", async (req, res) => {
         const lang = normalizeLanguage(language)
 
         const messages = [
-            { role: "system", content: SYSTEM_PROMPTS[lang] },
+            { role: "system", content: buildSystemPrompt(lang) },
             ...history.map(turn => ({
                 role: turn.role === "assistant" ? "assistant" : "user",
                 content: turn.content

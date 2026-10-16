@@ -400,6 +400,108 @@ canvas {
 }
 
 /* ======================
+   Suggested questions
+   ====================== */
+
+#suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+#suggestions.hidden {
+  display: none;
+}
+
+.suggestion-chip {
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 152, 152, 0.35);
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--teal-700);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.suggestion-chip:hover {
+  transform: translateY(-1px);
+  background: #fff;
+  border-color: var(--teal-600);
+}
+
+/* ======================
+   Idle warning
+   ====================== */
+
+#idle-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(16, 32, 31, 0.55);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+
+#idle-overlay.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.idle-card {
+  width: min(360px, 88vw);
+  padding: 26px 24px;
+  border-radius: 16px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(0, 152, 152, 0.3);
+  box-shadow: 0 14px 40px rgba(16, 32, 31, 0.3);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.idle-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  font-size: 20px;
+  color: var(--ink-900);
+}
+
+.idle-text {
+  font-size: 14.5px;
+  color: var(--ink-600);
+}
+
+.idle-btn {
+  margin-top: 4px;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 999px;
+  background: var(--teal-700);
+  color: var(--paper-100);
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.idle-btn:hover {
+  background: var(--teal-600);
+}
+
+/* ======================
    Responsive + accessibility floor
    ====================== */
 
@@ -415,6 +517,7 @@ canvas {
   .badge-sub { font-size: 10.5px; }
   #chat-ui { bottom: 16px; }
   #send-btn { padding: 0 16px; font-size: 13px; }
+  .suggestion-chip { font-size: 12px; padding: 8px 12px; }
 }
 
 :focus-visible {

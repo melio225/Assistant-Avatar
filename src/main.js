@@ -51,6 +51,11 @@ const AVATAR_CHARACTERS = [
 
 let currentLanguage = null // 'de' | 'en' — set on the start screen
 
+// Kiosk behaviour: after this much time without any input the page warns
+// and then reloads, which brings back the start screen for the next guest.
+const IDLE_TIMEOUT_MS = 3 * 60 * 1000 // total idle time before the reset
+const IDLE_WARNING_S = 20             // the warning is shown for the last N seconds
+
 const I18N = {
     de: {
         speechLang: 'de-DE',
@@ -64,6 +69,15 @@ const I18N = {
         thinking: 'Einen Moment...',
         micTitle: 'Per Sprache fragen',
         micUnsupported: 'Spracheingabe wird in diesem Browser nicht unterstützt',
+        suggestions: [
+            'Welche Studiengänge gibt es?',
+            'Wie kann ich mich bewerben?',
+            'Wo liegt der Campus?',
+            'Wann wurde die EAH Jena gegründet?'
+        ],
+        idleTitle: 'Noch da?',
+        idleText: 'Die Sitzung wird in {s} Sekunden zurückgesetzt.',
+        idleStay: 'Ich bin noch da',
         fallback: 'Das ist eine gute Frage — dazu habe ich noch keine Angabe, aber ich empfehle, auf eah-jena.de nachzuschauen oder das Studierendensekretariat zu fragen.'
     },
     en: {
@@ -78,6 +92,15 @@ const I18N = {
         thinking: 'One moment...',
         micTitle: 'Ask by voice',
         micUnsupported: 'Voice input is not supported in this browser',
+        suggestions: [
+            'Which programs can I study?',
+            'How can I apply?',
+            'Where is the campus?',
+            'When was EAH Jena founded?'
+        ],
+        idleTitle: 'Still there?',
+        idleText: 'The session will reset in {s} seconds.',
+        idleStay: "I'm still here",
         fallback: "That's a good question, but I don't have information on it yet. Please check eah-jena.de or ask the student office."
     }
 }
@@ -539,6 +562,7 @@ buildCharacterSelectUI((character, language) => {
     buildLoadingOverlay()
     buildChatUI()
     loadAvatar(character)
+    startIdleWatch()
 })
 
 
@@ -920,6 +944,82 @@ async function speak(text) {
 
 
 // ======================
+// Idle reset (kiosk mode)
+// ======================
+//
+// Any pointer, key, touch or wheel input counts as activity, and so does
+// the avatar speaking. When the visitor goes quiet, a "still there?"
+// warning appears; if nobody reacts, the page reloads and shows the start
+// screen again (which also clears the conversation).
+
+let lastActivity = Date.now()
+let idleOverlayEl = null
+let idleSecondsEl = null
+
+function markActivity() {
+    lastActivity = Date.now()
+    hideIdleWarning()
+}
+
+function showIdleWarning(secondsLeft) {
+    if (!idleOverlayEl) {
+        idleOverlayEl = document.createElement("div")
+        idleOverlayEl.id = "idle-overlay"
+
+        const card = document.createElement("div")
+        card.className = "idle-card"
+
+        const title = document.createElement("div")
+        title.className = "idle-title"
+        title.textContent = t('idleTitle')
+
+        const text = document.createElement("div")
+        text.className = "idle-text"
+        idleSecondsEl = text
+
+        const btn = document.createElement("button")
+        btn.className = "idle-btn"
+        btn.type = "button"
+        btn.textContent = t('idleStay')
+        btn.addEventListener("click", markActivity)
+
+        card.appendChild(title)
+        card.appendChild(text)
+        card.appendChild(btn)
+        idleOverlayEl.appendChild(card)
+        document.body.appendChild(idleOverlayEl)
+    }
+    idleSecondsEl.textContent = t('idleText').replace('{s}', String(secondsLeft))
+    idleOverlayEl.classList.add("visible")
+}
+
+function hideIdleWarning() {
+    if (idleOverlayEl) idleOverlayEl.classList.remove("visible")
+}
+
+function startIdleWatch() {
+    lastActivity = Date.now()
+
+    ;["pointerdown", "keydown", "touchstart", "wheel"].forEach((evt) => {
+        window.addEventListener(evt, markActivity, { passive: true })
+    })
+
+    setInterval(() => {
+        // The avatar talking counts as activity, so long answers don't
+        // trigger a reset in the middle of a sentence.
+        if (isSpeaking) lastActivity = Date.now()
+
+        const remaining = IDLE_TIMEOUT_MS - (Date.now() - lastActivity)
+        if (remaining <= 0) {
+            window.location.reload()
+        } else if (remaining <= IDLE_WARNING_S * 1000) {
+            showIdleWarning(Math.ceil(remaining / 1000))
+        }
+    }, 1000)
+}
+
+
+// ======================
 // Chat UI
 // ======================
 
@@ -963,12 +1063,28 @@ function buildChatUI() {
     row.appendChild(input)
     row.appendChild(micBtn)
     row.appendChild(sendBtn)
+
+    // Tappable example questions, shown until the first question is asked.
+    const suggestionsEl = document.createElement("div")
+    suggestionsEl.id = "suggestions"
+    t('suggestions').forEach((question) => {
+        const chip = document.createElement("button")
+        chip.className = "suggestion-chip"
+        chip.type = "button"
+        chip.textContent = question
+        chip.addEventListener("click", () => handleQuestion(question))
+        suggestionsEl.appendChild(chip)
+    })
+
     container.appendChild(subtitle)
+    container.appendChild(suggestionsEl)
     container.appendChild(row)
     document.body.appendChild(container)
 
     async function handleQuestion(text) {
         if (!text || !text.trim()) return
+        suggestionsEl.classList.add("hidden")
+        markActivity()
         input.value = ""
         setSubtitle(t('thinking'))
         const answer = await getAnswer(text)
