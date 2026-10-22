@@ -5,6 +5,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm'
 
+import qrcode from 'qrcode-generator'
+
 import eahLogoUrl from './assets/EAH_Logo.png'
 
 // ======================
@@ -46,67 +48,474 @@ const AVATAR_CHARACTERS = [
 // The language is chosen on the start screen (required) and then used for
 // every UI text, the speech recognition, the browser voice fallback, the
 // offline FAQ, and is sent to the backend for chat + text-to-speech.
-// To add a language: add an entry here, one option in the start screen,
-// and a system prompt in server/server.js.
+//
+// To add a language:
+//   1. add it to LANGUAGES (code, native name, speech-recognition locale),
+//   2. add its texts to I18N (copy the English block and translate it),
+//   3. add its English name to LANGUAGE_NAMES in server/server.js.
+// A built-in offline FAQ only exists for German and English; every other
+// language shows the "fallback" text if the backend is unreachable.
 
-let currentLanguage = null // 'de' | 'en' — set on the start screen
+const LANGUAGES = [
+    { code: "en", native: "English", speech: "en-US" },
+    { code: "de", native: "Deutsch", speech: "de-DE" },
+    { code: "fr", native: "Français", speech: "fr-FR" },
+    { code: "es", native: "Español", speech: "es-ES" },
+    { code: "it", native: "Italiano", speech: "it-IT" },
+    { code: "pt", native: "Português", speech: "pt-PT" },
+    { code: "nl", native: "Nederlands", speech: "nl-NL" },
+    { code: "pl", native: "Polski", speech: "pl-PL" },
+    { code: "tr", native: "Türkçe", speech: "tr-TR" },
+    { code: "ru", native: "Русский", speech: "ru-RU" },
+    { code: "uk", native: "Українська", speech: "uk-UA" },
+    { code: "ar", native: "العربية", speech: "ar-SA", rtl: true },
+    { code: "zh", native: "中文", speech: "zh-CN" },
+    { code: "ja", native: "日本語", speech: "ja-JP" }
+]
+
+let currentLanguage = null // language code, set on the start screen
 
 // Kiosk behaviour: after this much time without any input the page warns
-// and then reloads, which brings back the start screen for the next guest.
+// and then reloads, which brings back the welcome screen for the next guest.
 const IDLE_TIMEOUT_MS = 3 * 60 * 1000 // total idle time before the reset
 const IDLE_WARNING_S = 20             // the warning is shown for the last N seconds
 
+// Two QR cards on the right side of the scene:
+//  - APP_QR:  the Ernst App. The QR code is a PICTURE you provide
+//             (public/images/ernst-app-qr.png); it is shown as it is and
+//             nothing is generated. Replace the file to change it. "url" is
+//             optional: if set, the card (and the small chip on phones)
+//             becomes a link; if empty, the chip is hidden on phones because
+//             only the picture exists. If the picture is missing, the card
+//             hides itself.
+//  - SITE_QR: the official website. This QR code is generated in the
+//             browser from the URL. Set the url to "" to hide the card.
+const APP_QR = {
+    title: "Ernst App",
+    image: "/images/ernst-app-qr.png",
+    url: "https://open.uninow.com/GeBKl" // the link encoded in the QR picture
+}
+const SITE_QR = {
+    title: "EAH Jena",
+    url: "https://www.eah-jena.de"
+}
+
+// Visual tuning — all motion and atmosphere values live here.
+const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+const FX = {
+    particleCount: 90,               // floating light dots in the scene (0 = off)
+    particleSpread: [1.7, 2.2, 1.0], // half-extent x, height y, half-extent z
+    particleSpeed: 0.06,             // upward drift
+    parallaxStrength: 0.12,          // how far the view follows the pointer
+    parallaxEase: 0.04,              // smoothing of that movement (0..1)
+    lightSwayAmount: 0.6,            // slow side-to-side movement of the key light
+    introDuration: 1.8,              // seconds for the camera move after the avatar loads
+    bubbleLifetimeMs: 7000,          // how long a question bubble stays visible
+    welcomeWordIntervalMs: 2600      // how fast the welcome word changes language
+}
+
+// The room around the avatar and how far the visitor may move the camera.
+// Angles are in radians; distances in scene units (the avatar is ~1.7 high).
+const ROOM = { halfWidth: 1.9, height: 2.8, back: -1.8, front: 5.2 }
+const CAMERA_LIMITS = {
+    minDistance: 2.4,
+    maxDistance: 3.8,
+    minAzimuth: -0.45,   // about 26 degrees to the left
+    maxAzimuth: 0.45,    // about 26 degrees to the right
+    minPolar: 1.2,       // how far the camera may look down from above
+    maxPolar: 1.75,      // how far it may drop below the eye line
+    rotateSpeed: 0.5
+}
+
 const I18N = {
-    de: {
-        speechLang: 'de-DE',
-        heading: 'Wähle deinen Assistenten',
-        langLabel: 'Sprache',
-        loading: 'Assistent wird geladen...',
-        badgeSub: 'Virtueller Campus-Assistent',
-        greeting: 'Hallo, wie kann ich dir heute helfen? Ich bin der virtuelle Assistent der EAH Jena.',
-        placeholder: 'Frag mich etwas über die EAH Jena...',
-        send: 'Senden',
-        thinking: 'Einen Moment...',
-        micTitle: 'Per Sprache fragen',
-        micUnsupported: 'Spracheingabe wird in diesem Browser nicht unterstützt',
-        suggestions: [
-            'Welche Studiengänge gibt es?',
-            'Wie kann ich mich bewerben?',
-            'Wo liegt der Campus?',
-            'Wann wurde die EAH Jena gegründet?'
+    "en": {
+        "welcome": "Welcome",
+        "chooseLanguage": "Choose your language",
+        "heading": "Choose your assistant",
+        "back": "Back",
+        "loading": "Loading assistant...",
+        "badgeSub": "Virtual Campus Assistant",
+        "greeting": "Hello, how can I help you today? I'm the virtual assistant of EAH Jena.",
+        "placeholder": "Ask me something about EAH Jena...",
+        "send": "Send",
+        "thinking": "One moment...",
+        "micTitle": "Ask by voice",
+        "micUnsupported": "Voice input is not supported in this browser",
+        "fallback": "That's a good question, but I don't have information on it yet. Please check eah-jena.de or ask the student office.",
+        "suggestions": [
+            "Which programs can I study?",
+            "How can I apply?",
+            "Where is the campus?",
+            "When was EAH Jena founded?"
         ],
-        idleTitle: 'Noch da?',
-        idleText: 'Die Sitzung wird in {s} Sekunden zurückgesetzt.',
-        idleStay: 'Ich bin noch da',
-        fallback: 'Das ist eine gute Frage — dazu habe ich noch keine Angabe, aber ich empfehle, auf eah-jena.de nachzuschauen oder das Studierendensekretariat zu fragen.'
+        "idleTitle": "Still there?",
+        "idleText": "The session will reset in {s} seconds.",
+        "idleStay": "I'm still here",
+        "appText": "Scan the QR code to download the app",
+        "siteLabel": "Website",
+        "siteText": "Scan the QR code to visit the website"
     },
-    en: {
-        speechLang: 'en-US',
-        heading: 'Choose your assistant',
-        langLabel: 'Language',
-        loading: 'Loading assistant...',
-        badgeSub: 'Virtual Campus Assistant',
-        greeting: "Hello, how can I help you today? I'm the virtual assistant of EAH Jena.",
-        placeholder: 'Ask me something about EAH Jena...',
-        send: 'Send',
-        thinking: 'One moment...',
-        micTitle: 'Ask by voice',
-        micUnsupported: 'Voice input is not supported in this browser',
-        suggestions: [
-            'Which programs can I study?',
-            'How can I apply?',
-            'Where is the campus?',
-            'When was EAH Jena founded?'
+    "de": {
+        "welcome": "Willkommen",
+        "chooseLanguage": "Wähle deine Sprache",
+        "heading": "Wähle deinen Assistenten",
+        "back": "Zurück",
+        "loading": "Assistent wird geladen...",
+        "badgeSub": "Virtueller Campus-Assistent",
+        "greeting": "Hallo, wie kann ich dir heute helfen? Ich bin der virtuelle Assistent der EAH Jena.",
+        "placeholder": "Frag mich etwas über die EAH Jena...",
+        "send": "Senden",
+        "thinking": "Einen Moment...",
+        "micTitle": "Per Sprache fragen",
+        "micUnsupported": "Spracheingabe wird in diesem Browser nicht unterstützt",
+        "fallback": "Das ist eine gute Frage — dazu habe ich noch keine Angabe, aber ich empfehle, auf eah-jena.de nachzuschauen oder das Studierendensekretariat zu fragen.",
+        "suggestions": [
+            "Welche Studiengänge gibt es?",
+            "Wie kann ich mich bewerben?",
+            "Wo liegt der Campus?",
+            "Wann wurde die EAH Jena gegründet?"
         ],
-        idleTitle: 'Still there?',
-        idleText: 'The session will reset in {s} seconds.',
-        idleStay: "I'm still here",
-        fallback: "That's a good question, but I don't have information on it yet. Please check eah-jena.de or ask the student office."
+        "idleTitle": "Noch da?",
+        "idleText": "Die Sitzung wird in {s} Sekunden zurückgesetzt.",
+        "idleStay": "Ich bin noch da",
+        "appText": "QR-Code scannen und die App herunterladen",
+        "siteLabel": "Webseite",
+        "siteText": "QR-Code scannen und die Website besuchen"
+    },
+    "fr": {
+        "welcome": "Bienvenue",
+        "chooseLanguage": "Choisissez votre langue",
+        "heading": "Choisissez votre assistant",
+        "back": "Retour",
+        "loading": "Chargement de l'assistant...",
+        "badgeSub": "Assistant virtuel du campus",
+        "greeting": "Bonjour, comment puis-je vous aider aujourd'hui ? Je suis l'assistant virtuel de l'EAH Jena.",
+        "placeholder": "Posez-moi une question sur l'EAH Jena...",
+        "send": "Envoyer",
+        "thinking": "Un instant...",
+        "micTitle": "Poser une question à voix haute",
+        "micUnsupported": "La saisie vocale n'est pas prise en charge par ce navigateur",
+        "fallback": "C'est une bonne question, mais je n'ai pas encore d'information à ce sujet. Je vous conseille de consulter eah-jena.de ou de vous adresser au secrétariat des étudiants.",
+        "suggestions": [
+            "Quelles filières puis-je étudier ?",
+            "Comment puis-je postuler ?",
+            "Où se trouve le campus ?",
+            "Quand l'EAH Jena a-t-elle été fondée ?"
+        ],
+        "idleTitle": "Toujours là ?",
+        "idleText": "La session sera réinitialisée dans {s} secondes.",
+        "idleStay": "Je suis toujours là",
+        "appText": "Scannez le code QR pour télécharger l'appli",
+        "siteLabel": "Site web",
+        "siteText": "Scannez le code QR pour visiter le site web"
+    },
+    "es": {
+        "welcome": "Bienvenido",
+        "chooseLanguage": "Elige tu idioma",
+        "heading": "Elige tu asistente",
+        "back": "Atrás",
+        "loading": "Cargando el asistente...",
+        "badgeSub": "Asistente virtual del campus",
+        "greeting": "¡Hola! ¿En qué puedo ayudarte hoy? Soy el asistente virtual de la EAH Jena.",
+        "placeholder": "Pregúntame algo sobre la EAH Jena...",
+        "send": "Enviar",
+        "thinking": "Un momento...",
+        "micTitle": "Preguntar por voz",
+        "micUnsupported": "La entrada de voz no es compatible con este navegador",
+        "fallback": "Es una buena pregunta, pero todavía no tengo información al respecto. Te recomiendo consultar eah-jena.de o preguntar en la secretaría de estudiantes.",
+        "suggestions": [
+            "¿Qué carreras puedo estudiar?",
+            "¿Cómo puedo solicitar plaza?",
+            "¿Dónde está el campus?",
+            "¿Cuándo se fundó la EAH Jena?"
+        ],
+        "idleTitle": "¿Sigues ahí?",
+        "idleText": "La sesión se reiniciará en {s} segundos.",
+        "idleStay": "Sigo aquí",
+        "appText": "Escanea el código QR para descargar la app",
+        "siteLabel": "Sitio web",
+        "siteText": "Escanea el código QR para visitar el sitio web"
+    },
+    "it": {
+        "welcome": "Benvenuto",
+        "chooseLanguage": "Scegli la tua lingua",
+        "heading": "Scegli il tuo assistente",
+        "back": "Indietro",
+        "loading": "Caricamento dell'assistente...",
+        "badgeSub": "Assistente virtuale del campus",
+        "greeting": "Ciao, come posso aiutarti oggi? Sono l'assistente virtuale della EAH Jena.",
+        "placeholder": "Chiedimi qualcosa sulla EAH Jena...",
+        "send": "Invia",
+        "thinking": "Un attimo...",
+        "micTitle": "Chiedi a voce",
+        "micUnsupported": "L'input vocale non è supportato da questo browser",
+        "fallback": "È una bella domanda, ma non ho ancora informazioni a riguardo. Ti consiglio di consultare eah-jena.de o di rivolgerti alla segreteria studenti.",
+        "suggestions": [
+            "Quali corsi di studio posso frequentare?",
+            "Come posso candidarmi?",
+            "Dov'è il campus?",
+            "Quando è stata fondata la EAH Jena?"
+        ],
+        "idleTitle": "Sei ancora lì?",
+        "idleText": "La sessione verrà reimpostata tra {s} secondi.",
+        "idleStay": "Sono ancora qui",
+        "appText": "Scansiona il codice QR per scaricare l'app",
+        "siteLabel": "Sito web",
+        "siteText": "Scansiona il codice QR per visitare il sito web"
+    },
+    "pt": {
+        "welcome": "Bem-vindo",
+        "chooseLanguage": "Escolha o seu idioma",
+        "heading": "Escolha o seu assistente",
+        "back": "Voltar",
+        "loading": "A carregar o assistente...",
+        "badgeSub": "Assistente virtual do campus",
+        "greeting": "Olá, como posso ajudá-lo hoje? Sou o assistente virtual da EAH Jena.",
+        "placeholder": "Pergunte-me algo sobre a EAH Jena...",
+        "send": "Enviar",
+        "thinking": "Um momento...",
+        "micTitle": "Perguntar por voz",
+        "micUnsupported": "A entrada de voz não é suportada neste navegador",
+        "fallback": "É uma boa pergunta, mas ainda não tenho informação sobre isso. Recomendo consultar eah-jena.de ou perguntar na secretaria de estudantes.",
+        "suggestions": [
+            "Que cursos posso estudar?",
+            "Como posso candidatar-me?",
+            "Onde fica o campus?",
+            "Quando foi fundada a EAH Jena?"
+        ],
+        "idleTitle": "Ainda aí?",
+        "idleText": "A sessão será reiniciada em {s} segundos.",
+        "idleStay": "Ainda estou aqui",
+        "appText": "Leia o código QR para descarregar a app",
+        "siteLabel": "Site",
+        "siteText": "Leia o código QR para visitar o site"
+    },
+    "nl": {
+        "welcome": "Welkom",
+        "chooseLanguage": "Kies je taal",
+        "heading": "Kies je assistent",
+        "back": "Terug",
+        "loading": "Assistent wordt geladen...",
+        "badgeSub": "Virtuele campusassistent",
+        "greeting": "Hallo, waarmee kan ik je vandaag helpen? Ik ben de virtuele assistent van de EAH Jena.",
+        "placeholder": "Stel me een vraag over de EAH Jena...",
+        "send": "Verzenden",
+        "thinking": "Een moment...",
+        "micTitle": "Stel je vraag met je stem",
+        "micUnsupported": "Spraakinvoer wordt in deze browser niet ondersteund",
+        "fallback": "Dat is een goede vraag, maar daar heb ik nog geen informatie over. Kijk op eah-jena.de of vraag het bij het studentensecretariaat.",
+        "suggestions": [
+            "Welke opleidingen kan ik volgen?",
+            "Hoe kan ik me aanmelden?",
+            "Waar ligt de campus?",
+            "Wanneer is de EAH Jena opgericht?"
+        ],
+        "idleTitle": "Ben je er nog?",
+        "idleText": "De sessie wordt over {s} seconden gereset.",
+        "idleStay": "Ik ben er nog",
+        "appText": "Scan de QR-code om de app te downloaden",
+        "siteLabel": "Website",
+        "siteText": "Scan de QR-code om de website te bezoeken"
+    },
+    "pl": {
+        "welcome": "Witamy",
+        "chooseLanguage": "Wybierz język",
+        "heading": "Wybierz swojego asystenta",
+        "back": "Wstecz",
+        "loading": "Ładowanie asystenta...",
+        "badgeSub": "Wirtualny asystent kampusu",
+        "greeting": "Cześć, w czym mogę dziś pomóc? Jestem wirtualnym asystentem EAH Jena.",
+        "placeholder": "Zapytaj mnie o EAH Jena...",
+        "send": "Wyślij",
+        "thinking": "Chwileczkę...",
+        "micTitle": "Zapytaj głosowo",
+        "micUnsupported": "Wprowadzanie głosowe nie jest obsługiwane w tej przeglądarce",
+        "fallback": "To dobre pytanie, ale nie mam jeszcze na ten temat informacji. Zajrzyj na eah-jena.de lub zapytaj w biurze obsługi studentów.",
+        "suggestions": [
+            "Jakie kierunki mogę studiować?",
+            "Jak mogę się zgłosić?",
+            "Gdzie znajduje się kampus?",
+            "Kiedy założono EAH Jena?"
+        ],
+        "idleTitle": "Nadal tu jesteś?",
+        "idleText": "Sesja zostanie zresetowana za {s} s.",
+        "idleStay": "Nadal tu jestem",
+        "appText": "Zeskanuj kod QR, aby pobrać aplikację",
+        "siteLabel": "Strona",
+        "siteText": "Zeskanuj kod QR, aby odwiedzić stronę"
+    },
+    "tr": {
+        "welcome": "Hoş geldiniz",
+        "chooseLanguage": "Dilinizi seçin",
+        "heading": "Asistanınızı seçin",
+        "back": "Geri",
+        "loading": "Asistan yükleniyor...",
+        "badgeSub": "Sanal kampüs asistanı",
+        "greeting": "Merhaba, bugün size nasıl yardımcı olabilirim? Ben EAH Jena'nın sanal asistanıyım.",
+        "placeholder": "Bana EAH Jena hakkında bir şey sorun...",
+        "send": "Gönder",
+        "thinking": "Bir saniye...",
+        "micTitle": "Sesli sor",
+        "micUnsupported": "Sesli giriş bu tarayıcıda desteklenmiyor",
+        "fallback": "Güzel bir soru, ancak henüz bu konuda bilgim yok. eah-jena.de adresine bakmanızı veya öğrenci işlerine danışmanızı öneririm.",
+        "suggestions": [
+            "Hangi bölümlerde okuyabilirim?",
+            "Nasıl başvurabilirim?",
+            "Kampüs nerede?",
+            "EAH Jena ne zaman kuruldu?"
+        ],
+        "idleTitle": "Hâlâ orada mısınız?",
+        "idleText": "Oturum {s} saniye içinde sıfırlanacak.",
+        "idleStay": "Buradayım",
+        "appText": "Uygulamayı indirmek için QR kodu tarayın",
+        "siteLabel": "Web sitesi",
+        "siteText": "Web sitesini ziyaret etmek için QR kodu tarayın"
+    },
+    "ru": {
+        "welcome": "Добро пожаловать",
+        "chooseLanguage": "Выберите язык",
+        "heading": "Выберите ассистента",
+        "back": "Назад",
+        "loading": "Загрузка ассистента...",
+        "badgeSub": "Виртуальный ассистент кампуса",
+        "greeting": "Здравствуйте! Чем могу помочь? Я виртуальный ассистент EAH Jena.",
+        "placeholder": "Спросите меня об EAH Jena...",
+        "send": "Отправить",
+        "thinking": "Минутку...",
+        "micTitle": "Задать вопрос голосом",
+        "micUnsupported": "Голосовой ввод не поддерживается в этом браузере",
+        "fallback": "Хороший вопрос, но у меня пока нет информации об этом. Рекомендую заглянуть на eah-jena.de или обратиться в студенческий секретариат.",
+        "suggestions": [
+            "Какие специальности можно выбрать?",
+            "Как подать заявление?",
+            "Где находится кампус?",
+            "Когда основана EAH Jena?"
+        ],
+        "idleTitle": "Вы ещё здесь?",
+        "idleText": "Сеанс будет сброшен через {s} с.",
+        "idleStay": "Я здесь",
+        "appText": "Отсканируйте QR-код, чтобы скачать приложение",
+        "siteLabel": "Сайт",
+        "siteText": "Отсканируйте QR-код, чтобы открыть сайт"
+    },
+    "uk": {
+        "welcome": "Ласкаво просимо",
+        "chooseLanguage": "Оберіть мову",
+        "heading": "Оберіть асистента",
+        "back": "Назад",
+        "loading": "Завантаження асистента...",
+        "badgeSub": "Віртуальний асистент кампусу",
+        "greeting": "Вітаю! Чим я можу допомогти? Я віртуальний асистент EAH Jena.",
+        "placeholder": "Запитайте мене про EAH Jena...",
+        "send": "Надіслати",
+        "thinking": "Хвилинку...",
+        "micTitle": "Запитати голосом",
+        "micUnsupported": "Голосове введення не підтримується в цьому браузері",
+        "fallback": "Гарне запитання, але в мене поки немає інформації про це. Радимо зазирнути на eah-jena.de або звернутися до студентського секретаріату.",
+        "suggestions": [
+            "Які спеціальності можна обрати?",
+            "Як подати заявку?",
+            "Де розташований кампус?",
+            "Коли засновано EAH Jena?"
+        ],
+        "idleTitle": "Ви ще тут?",
+        "idleText": "Сеанс буде скинуто через {s} с.",
+        "idleStay": "Я тут",
+        "appText": "Скануйте QR-код, щоб завантажити застосунок",
+        "siteLabel": "Вебсайт",
+        "siteText": "Скануйте QR-код, щоб відкрити вебсайт"
+    },
+    "ar": {
+        "welcome": "مرحباً بكم",
+        "chooseLanguage": "اختر لغتك",
+        "heading": "اختر مساعدك",
+        "back": "رجوع",
+        "loading": "جارٍ تحميل المساعد...",
+        "badgeSub": "المساعد الافتراضي للحرم الجامعي",
+        "greeting": "مرحباً، كيف يمكنني مساعدتك اليوم؟ أنا المساعد الافتراضي لجامعة EAH Jena.",
+        "placeholder": "اسألني عن جامعة EAH Jena...",
+        "send": "إرسال",
+        "thinking": "لحظة من فضلك...",
+        "micTitle": "اسأل بالصوت",
+        "micUnsupported": "الإدخال الصوتي غير مدعوم في هذا المتصفح",
+        "fallback": "سؤال جيد، لكن ليست لدي معلومات عنه بعد. أنصحك بزيارة eah-jena.de أو سؤال شؤون الطلاب.",
+        "suggestions": [
+            "ما التخصصات التي يمكنني دراستها؟",
+            "كيف أتقدم بطلب الالتحاق؟",
+            "أين يقع الحرم الجامعي؟",
+            "متى تأسست EAH Jena؟"
+        ],
+        "idleTitle": "هل ما زلت هنا؟",
+        "idleText": "ستُعاد تهيئة الجلسة خلال {s} ثانية.",
+        "idleStay": "ما زلت هنا",
+        "appText": "امسح رمز QR لتحميل التطبيق",
+        "siteLabel": "الموقع",
+        "siteText": "امسح رمز QR لزيارة الموقع الإلكتروني"
+    },
+    "zh": {
+        "welcome": "欢迎",
+        "chooseLanguage": "请选择语言",
+        "heading": "请选择您的助手",
+        "back": "返回",
+        "loading": "正在加载助手……",
+        "badgeSub": "虚拟校园助手",
+        "greeting": "您好，今天有什么可以帮您？我是 EAH Jena 的虚拟助手。",
+        "placeholder": "向我询问有关 EAH Jena 的问题……",
+        "send": "发送",
+        "thinking": "请稍等……",
+        "micTitle": "语音提问",
+        "micUnsupported": "此浏览器不支持语音输入",
+        "fallback": "这是个好问题，但我暂时没有相关信息。建议您访问 eah-jena.de 或咨询学生事务办公室。",
+        "suggestions": [
+            "我可以学习哪些专业？",
+            "我该如何申请？",
+            "校园在哪里？",
+            "EAH Jena 是什么时候成立的？"
+        ],
+        "idleTitle": "您还在吗？",
+        "idleText": "会话将在 {s} 秒后重置。",
+        "idleStay": "我还在",
+        "appText": "扫描二维码下载应用",
+        "siteLabel": "官网",
+        "siteText": "扫描二维码访问网站"
+    },
+    "ja": {
+        "welcome": "ようこそ",
+        "chooseLanguage": "言語を選択してください",
+        "heading": "アシスタントを選択してください",
+        "back": "戻る",
+        "loading": "アシスタントを読み込み中…",
+        "badgeSub": "バーチャルキャンパスアシスタント",
+        "greeting": "こんにちは。本日はどのようなご用件でしょうか。私は EAH Jena のバーチャルアシスタントです。",
+        "placeholder": "EAH Jena について質問してください…",
+        "send": "送信",
+        "thinking": "少々お待ちください…",
+        "micTitle": "音声で質問する",
+        "micUnsupported": "このブラウザでは音声入力に対応していません",
+        "fallback": "良いご質問ですが、まだ情報がありません。eah-jena.de をご覧いただくか、学生課にお問い合わせください。",
+        "suggestions": [
+            "どんな学科がありますか？",
+            "どうやって出願しますか？",
+            "キャンパスはどこにありますか？",
+            "EAH Jena はいつ設立されましたか？"
+        ],
+        "idleTitle": "まだいらっしゃいますか？",
+        "idleText": "{s} 秒後にリセットされます。",
+        "idleStay": "まだいます",
+        "appText": "QRコードを読み取ってアプリをダウンロード",
+        "siteLabel": "ウェブサイト",
+        "siteText": "QRコードを読み取ってウェブサイトへ"
     }
 }
 
+// Text lookup: falls back to English if a key is missing in a language.
 function t(key) {
-    return I18N[currentLanguage || 'de'][key]
+    const code = currentLanguage || 'de'
+    if (key === 'speechLang') {
+        return (LANGUAGES.find(l => l.code === code) || LANGUAGES[0]).speech
+    }
+    const entry = I18N[code] || I18N.en
+    return entry[key] !== undefined ? entry[key] : I18N.en[key]
 }
 
 
@@ -178,7 +587,10 @@ const KNOWLEDGE_BASE_EN = [
 
 function findAnswer(question) {
     const q = question.toLowerCase()
-    const base = currentLanguage === 'en' ? KNOWLEDGE_BASE_EN : KNOWLEDGE_BASE
+    // Built-in offline answers exist for German and English only.
+    const base = currentLanguage === 'en' ? KNOWLEDGE_BASE_EN
+        : currentLanguage === 'de' ? KNOWLEDGE_BASE
+        : []
     for (const entry of base) {
         if (entry.keywords.some(k => q.includes(k))) {
             return entry.answer
@@ -259,10 +671,10 @@ function createGradientBackground() {
 }
 
 const scene = new THREE.Scene()
-scene.background = createGradientBackground()
+scene.background = new THREE.Color(0x002e2e) // seen only if the room is not covering the view
 
 const ground = new THREE.Mesh(
-    new THREE.CircleGeometry(2.2, 64),
+    new THREE.CircleGeometry(1.7, 64),
     new THREE.MeshStandardMaterial({
         color: 0x003333,
         transparent: true,
@@ -272,6 +684,237 @@ const ground = new THREE.Mesh(
 )
 ground.rotation.x = -Math.PI / 2
 scene.add(ground)
+
+// A thin glowing ring on the floor that breathes slowly.
+const ring = new THREE.Mesh(
+    new THREE.RingGeometry(1.6, 1.68, 96),
+    new THREE.MeshBasicMaterial({
+        color: 0x7fd0d0,
+        transparent: true,
+        opacity: 0.3,
+        side: THREE.DoubleSide
+    })
+)
+ring.rotation.x = -Math.PI / 2
+ring.position.y = 0.002
+scene.add(ring)
+
+// ======================
+// Room (a closed cube around the avatar)
+// ======================
+//
+// Unlit materials with painted textures, so the look is exactly what is
+// drawn here and does not depend on scene lighting. The camera limits
+// further below keep the visitor inside the room.
+
+const ROOM_DEPTH = ROOM.front - ROOM.back
+const ROOM_CENTER_Z = (ROOM.front + ROOM.back) / 2
+const ROOM_WIDTH = ROOM.halfWidth * 2
+
+function paintedTexture(w, h, paint) {
+    const canvas = document.createElement("canvas")
+    canvas.width = w
+    canvas.height = h
+    paint(canvas.getContext("2d"), w, h)
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.anisotropy = 4
+    return texture
+}
+
+// worldW x worldH is the real size of the wall in scene units, so panel
+// widths and the baseboard keep correct proportions on every wall.
+function wallTexture(worldW, worldH) {
+    const w = 1024
+    const h = Math.round(w * worldH / worldW)
+    return paintedTexture(w, h, (g) => {
+        const base = g.createLinearGradient(0, 0, 0, h)
+        base.addColorStop(0, "#005c5c")
+        base.addColorStop(0.55, "#007070")
+        base.addColorStop(1, "#004a4b")
+        g.fillStyle = base
+        g.fillRect(0, 0, w, h)
+
+        // vertical panels, 0.7 units wide
+        const panelW = 0.7 / worldW * w
+        let n = 0
+        for (let x = 0; x < w; x += panelW, n++) {
+            if (n % 2 === 1) {
+                g.fillStyle = "rgba(255,255,255,0.035)"
+                g.fillRect(x, 0, panelW, h)
+            }
+            g.fillStyle = "rgba(0,0,0,0.18)"
+            g.fillRect(x - 2, 0, 4, h)
+            g.fillStyle = "rgba(127,208,208,0.12)"
+            g.fillRect(x + 2, 0, 2, h)
+        }
+
+        // light spilling down from the ceiling
+        const spill = g.createLinearGradient(0, 0, 0, h * 0.4)
+        spill.addColorStop(0, "rgba(207,250,250,0.32)")
+        spill.addColorStop(1, "rgba(207,250,250,0)")
+        g.fillStyle = spill
+        g.fillRect(0, 0, w, h * 0.4)
+
+        // baseboard with a thin glowing line on top
+        const bb = 0.16 / worldH * h
+        g.fillStyle = "#003636"
+        g.fillRect(0, h - bb, w, bb)
+        g.fillStyle = "rgba(127,208,208,0.65)"
+        g.fillRect(0, h - bb - 3, w, 3)
+
+        // darker corners where walls meet
+        const edge = w * 0.10
+        ;[[0, edge], [w, w - edge]].forEach(([x0, x1]) => {
+            const gr = g.createLinearGradient(x0, 0, x1, 0)
+            gr.addColorStop(0, "rgba(0,20,20,0.45)")
+            gr.addColorStop(1, "rgba(0,20,20,0)")
+            g.fillStyle = gr
+            g.fillRect(Math.min(x0, x1), 0, edge, h)
+        })
+    })
+}
+
+function floorTexture() {
+    const w = 512
+    const h = Math.round(w * ROOM_DEPTH / ROOM_WIDTH)
+    return paintedTexture(w, h, (g) => {
+        g.fillStyle = "#003c3c"
+        g.fillRect(0, 0, w, h)
+
+        // 0.5-unit grid
+        g.strokeStyle = "rgba(127,208,208,0.13)"
+        g.lineWidth = 2
+        for (let x = 0; x <= w; x += 0.5 / ROOM_WIDTH * w) {
+            g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke()
+        }
+        for (let y = 0; y <= h; y += 0.5 / ROOM_DEPTH * h) {
+            g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke()
+        }
+
+        // soft glow around the spot where the avatar stands (z = 0);
+        // the top of this texture is the back wall
+        const cy = (0 - ROOM.back) / ROOM_DEPTH * h
+        const glow = g.createRadialGradient(w / 2, cy, 0, w / 2, cy, w * 0.62)
+        glow.addColorStop(0, "rgba(127,208,208,0.42)")
+        glow.addColorStop(1, "rgba(127,208,208,0)")
+        g.fillStyle = glow
+        g.fillRect(0, 0, w, h)
+    })
+}
+
+function ceilingTexture() {
+    const w = 512
+    const h = Math.round(w * ROOM_DEPTH / ROOM_WIDTH)
+    return paintedTexture(w, h, (g) => {
+        g.fillStyle = "#00302f"
+        g.fillRect(0, 0, w, h)
+
+        // glowing light panels above the avatar and in front of it;
+        // the top of this texture is the front of the room
+        ;[0, 2.6].forEach((z) => {
+            const cy = (ROOM.front - z) / ROOM_DEPTH * h
+            const pw = 1.1 / ROOM_WIDTH * w
+            const ph = 1.4 / ROOM_DEPTH * h
+            g.save()
+            g.shadowColor = "rgba(207,250,250,0.9)"
+            g.shadowBlur = 40
+            g.fillStyle = "#e6ffff"
+            g.fillRect(w / 2 - pw / 2, cy - ph / 2, pw, ph)
+            g.restore()
+        })
+    })
+}
+
+function addRoom() {
+    const flat = (map) => new THREE.MeshBasicMaterial({ map })
+    const H = ROOM.height
+
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_WIDTH, ROOM_DEPTH), flat(floorTexture()))
+    floor.rotation.x = -Math.PI / 2
+    floor.position.set(0, -0.001, ROOM_CENTER_Z)
+
+    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_WIDTH, ROOM_DEPTH), flat(ceilingTexture()))
+    ceiling.rotation.x = Math.PI / 2
+    ceiling.position.set(0, H, ROOM_CENTER_Z)
+
+    const backWall = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_WIDTH, H), flat(wallTexture(ROOM_WIDTH, H)))
+    backWall.position.set(0, H / 2, ROOM.back)
+
+    const left = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_DEPTH, H), flat(wallTexture(ROOM_DEPTH, H)))
+    left.rotation.y = Math.PI / 2
+    left.position.set(-ROOM.halfWidth, H / 2, ROOM_CENTER_Z)
+
+    const right = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_DEPTH, H), flat(wallTexture(ROOM_DEPTH, H)))
+    right.rotation.y = -Math.PI / 2
+    right.position.set(ROOM.halfWidth, H / 2, ROOM_CENTER_Z)
+
+    scene.add(floor, ceiling, backWall, left, right)
+}
+
+addRoom()
+
+// Soft floating light dots behind and around the avatar.
+function createSoftDotTexture() {
+    const c = document.createElement("canvas")
+    c.width = c.height = 64
+    const g = c.getContext("2d")
+    const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32)
+    grad.addColorStop(0, "rgba(255,255,255,1)")
+    grad.addColorStop(0.4, "rgba(255,255,255,0.35)")
+    grad.addColorStop(1, "rgba(255,255,255,0)")
+    g.fillStyle = grad
+    g.fillRect(0, 0, 64, 64)
+    return new THREE.CanvasTexture(c)
+}
+
+const particleCount = REDUCED_MOTION ? 0 : FX.particleCount
+const particleSeeds = []
+let particles = null
+
+if (particleCount > 0) {
+    const positions = new Float32Array(particleCount * 3)
+    for (let i = 0; i < particleCount; i++) {
+        positions[i * 3] = (Math.random() * 2 - 1) * FX.particleSpread[0]
+        positions[i * 3 + 1] = Math.random() * FX.particleSpread[1] + 0.1
+        positions[i * 3 + 2] = (Math.random() * 2 - 1) * FX.particleSpread[2] - 0.5
+        particleSeeds.push(Math.random() * Math.PI * 2)
+    }
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3))
+    particles = new THREE.Points(
+        geometry,
+        new THREE.PointsMaterial({
+            size: 0.07,
+            map: createSoftDotTexture(),
+            color: 0xcffafa,
+            transparent: true,
+            opacity: 0.55,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        })
+    )
+    scene.add(particles)
+}
+
+function updateAtmosphere(delta, elapsed) {
+    if (REDUCED_MOTION) return
+
+    if (particles) {
+        const pos = particles.geometry.attributes.position
+        for (let i = 0; i < particleCount; i++) {
+            let y = pos.getY(i) + FX.particleSpeed * delta * (0.5 + (i % 5) * 0.25)
+            if (y > FX.particleSpread[1] + 0.3) y = 0.1
+            pos.setY(i, y)
+            pos.setX(i, pos.getX(i) + Math.sin(elapsed * 0.4 + particleSeeds[i]) * 0.0006)
+        }
+        pos.needsUpdate = true
+    }
+
+    ring.material.opacity = 0.28 + Math.sin(elapsed * 1.2) * 0.08
+    ring.scale.setScalar(1 + Math.sin(elapsed * 0.8) * 0.015)
+    directionalLight.position.x = 1 + Math.sin(elapsed * 0.35) * FX.lightSwayAmount
+}
 
 
 // ======================
@@ -332,52 +975,268 @@ function buildVignette() {
     document.body.appendChild(v)
 }
 
-// Start screen: language (required dropdown) + avatar (name buttons with
-// picture). Avatars stay locked until a language is chosen; clicking a
-// locked avatar highlights the dropdown instead of doing nothing.
+// QR code as an inline SVG, drawn from the module matrix (no HTML strings).
+function buildQrSvg(url) {
+    const qr = qrcode(0, "M")
+    qr.addData(url)
+    qr.make()
+    const n = qr.getModuleCount()
+    const margin = 2
+    let d = ""
+    for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+            if (qr.isDark(r, c)) d += `M${c + margin} ${r + margin}h1v1h-1z`
+        }
+    }
+    const NS = "http://www.w3.org/2000/svg"
+    const svg = document.createElementNS(NS, "svg")
+    svg.setAttribute("viewBox", `0 0 ${n + margin * 2} ${n + margin * 2}`)
+    svg.setAttribute("shape-rendering", "crispEdges")
+    svg.setAttribute("role", "img")
+    svg.setAttribute("aria-label", "QR code")
+    const bg = document.createElementNS(NS, "rect")
+    bg.setAttribute("width", "100%")
+    bg.setAttribute("height", "100%")
+    bg.setAttribute("fill", "#ffffff")
+    const path = document.createElementNS(NS, "path")
+    path.setAttribute("d", d)
+    path.setAttribute("fill", "#10201f")
+    svg.appendChild(bg)
+    svg.appendChild(path)
+    return svg
+}
+
+// One card with a title, a QR code (any DOM node), a short text and, if
+// there is a link, the address. Cards with a link are clickable.
+function buildQrCard({ id, title, qrNode, text, url }) {
+    const card = document.createElement(url ? "a" : "div")
+    card.id = id
+    card.className = "qr-card" + (url ? "" : " no-link")
+    if (url) {
+        card.href = url
+        card.target = "_blank"
+        card.rel = "noopener noreferrer"
+    } else {
+        card.setAttribute("role", "group")
+    }
+    card.setAttribute("aria-label", `${title}: ${text}`)
+
+    const titleEl = document.createElement("div")
+    titleEl.className = "qr-card-title"
+    titleEl.textContent = title
+
+    const qrBox = document.createElement("div")
+    qrBox.className = "qr-card-qr"
+    qrBox.appendChild(qrNode)
+
+    const textEl = document.createElement("div")
+    textEl.className = "qr-card-text"
+    textEl.textContent = text
+
+    card.appendChild(titleEl)
+    card.appendChild(qrBox)
+    card.appendChild(textEl)
+
+    if (url) {
+        const urlEl = document.createElement("div")
+        urlEl.className = "qr-card-url"
+        urlEl.textContent = url.replace(/^https?:\/\//, "").replace(/\/$/, "")
+        card.appendChild(urlEl)
+    }
+    return card
+}
+
+// The Ernst App card (picture) on top, the website card (generated) below.
+// On small screens both shrink to compact link chips (see the CSS).
+function buildQrPanels() {
+    const panel = document.createElement("div")
+    panel.id = "qr-panels"
+
+    if (APP_QR.image) {
+        const img = document.createElement("img")
+        img.src = APP_QR.image
+        img.alt = `QR code: ${APP_QR.title}`
+        const card = buildQrCard({
+            id: "qr-app",
+            title: APP_QR.title,
+            qrNode: img,
+            text: t('appText'),
+            url: APP_QR.url
+        })
+        img.addEventListener("error", () => card.remove()) // picture missing: no card
+        panel.appendChild(card)
+    }
+
+    if (SITE_QR.url) {
+        panel.appendChild(buildQrCard({
+            id: "qr-site",
+            title: `${SITE_QR.title} · ${t('siteLabel')}`,
+            qrNode: buildQrSvg(SITE_QR.url),
+            text: t('siteText'),
+            url: SITE_QR.url
+        }))
+    }
+
+    if (panel.children.length) document.body.appendChild(panel)
+}
+
+// Start flow in three steps, one screen each:
+//   1. welcome   – animated greeting that cycles through all languages
+//   2. language  – one button per language
+//   3. avatar    – choose Elena or Mika, shown in the chosen language
+// Elements of the active step rise in one after another (--i drives the
+// CSS delay). Choosing an avatar fades the overlay out while the loading
+// screen takes over.
 function buildCharacterSelectUI(onSelect) {
     const overlay = document.createElement("div")
     overlay.id = "character-select-overlay"
-    overlay.classList.add("locked")
 
-    const langLabel = document.createElement("label")
-    langLabel.className = "language-label"
-    langLabel.htmlFor = "language-select"
-    langLabel.textContent = "Language / Sprache"
+    const steps = {}
+    function makeStep(name) {
+        const el = document.createElement("section")
+        el.className = "step"
+        steps[name] = el
+        overlay.appendChild(el)
+        return el
+    }
+    // Adds an element to a step with its position in the entrance order.
+    function put(step, el, order) {
+        el.classList.add("stagger")
+        el.style.setProperty("--i", String(order))
+        step.appendChild(el)
+        return el
+    }
+    function div(className, text) {
+        const el = document.createElement("div")
+        el.className = className
+        if (text !== undefined) el.textContent = text
+        return el
+    }
+    function backButton(label, onClick) {
+        const btn = document.createElement("button")
+        btn.type = "button"
+        btn.className = "step-back"
+        btn.setAttribute("aria-label", label)
+        btn.textContent = "←"
+        btn.addEventListener("click", onClick)
+        return btn
+    }
 
-    const select = document.createElement("select")
-    select.id = "language-select"
-    select.className = "language-select"
-    select.required = true
+    let welcomeTimer = null
+    function stopWelcome() {
+        if (welcomeTimer) clearInterval(welcomeTimer)
+        welcomeTimer = null
+    }
+    function goStep(name) {
+        Object.entries(steps).forEach(([key, el]) => el.classList.toggle("active", key === name))
+        if (name !== "welcome") stopWelcome()
+    }
 
-    const placeholder = document.createElement("option")
-    placeholder.value = ""
-    placeholder.textContent = "Choose / Wählen …"
-    placeholder.disabled = true
-    placeholder.selected = true
-    select.appendChild(placeholder)
+    // ---- step 1: welcome ----
+    const welcome = makeStep("welcome")
 
-    ;[
-        { value: "en", label: "English" },
-        { value: "de", label: "Deutsch" }
-    ].forEach(({ value, label }) => {
-        const option = document.createElement("option")
-        option.value = value
-        option.textContent = label
-        select.appendChild(option)
+    const logoWrap = div("welcome-logo")
+    const logo = document.createElement("img")
+    logo.src = eahLogoUrl
+    logo.alt = "EAH Jena"
+    logoWrap.appendChild(logo)
+    put(welcome, logoWrap, 0)
+
+    const wordWrap = div("welcome-word-wrap")
+    wordWrap.setAttribute("aria-label", "Welcome")
+    put(welcome, wordWrap, 1)
+
+    put(welcome, div("start-title", "Ernst-Abbe-Hochschule Jena"), 2)
+    put(welcome, div("start-sub", "Virtual Campus Assistant"), 3)
+
+    const startWrap = div("start-btn-wrap")
+    const startBtn = document.createElement("button")
+    startBtn.type = "button"
+    startBtn.className = "start-btn"
+    startBtn.textContent = "Start  →"
+    startBtn.addEventListener("click", () => goStep("language"))
+    startWrap.appendChild(startBtn)
+    put(welcome, startWrap, 4)
+
+    // The welcome word changes language every few seconds.
+    let wordIndex = 0
+    function showWord(index) {
+        const lang = LANGUAGES[index]
+        wordWrap.querySelectorAll(".welcome-word").forEach((old) => {
+            old.classList.add("out")
+            setTimeout(() => old.remove(), 600)
+        })
+        const span = document.createElement("span")
+        span.className = "welcome-word"
+        span.lang = lang.code
+        span.setAttribute("aria-hidden", "true")
+        span.textContent = I18N[lang.code].welcome
+        wordWrap.appendChild(span)
+    }
+    showWord(0)
+    if (!REDUCED_MOTION) {
+        welcomeTimer = setInterval(() => {
+            wordIndex = (wordIndex + 1) % LANGUAGES.length
+            showWord(wordIndex)
+        }, FX.welcomeWordIntervalMs)
+    }
+
+    // ---- step 2: language ----
+    const languageStep = makeStep("language")
+    put(languageStep, backButton("Back", () => goStep("welcome")), 0)
+    put(languageStep, div("step-title", "Choose your language"), 1)
+
+    const languageGrid = div("language-grid")
+    put(languageStep, languageGrid, 2)
+
+    // ---- step 3: avatar ----
+    const avatarStep = makeStep("avatar")
+    const avatarBack = backButton("Back", () => goStep("language"))
+    put(avatarStep, avatarBack, 0)
+    const avatarHeading = put(avatarStep, div("step-title", ""), 1)
+    const avatarGrid = div("character-select-grid")
+    put(avatarStep, avatarGrid, 2)
+
+    function chooseLanguage(code) {
+        const lang = LANGUAGES.find(l => l.code === code)
+        currentLanguage = code
+        document.documentElement.lang = code
+        document.documentElement.dir = lang.rtl ? "rtl" : "ltr"
+        avatarHeading.textContent = t('heading')
+        avatarBack.setAttribute("aria-label", t('back'))
+        languageGrid.querySelectorAll(".language-btn").forEach((b) => {
+            b.classList.toggle("selected", b.dataset.code === code)
+        })
+        goStep("avatar")
+    }
+
+    LANGUAGES.forEach((lang, i) => {
+        const btn = document.createElement("button")
+        btn.type = "button"
+        btn.className = "language-btn stagger"
+        btn.style.setProperty("--i", String(i))
+        btn.dataset.code = lang.code
+
+        const nativeName = document.createElement("span")
+        nativeName.className = "language-native"
+        nativeName.lang = lang.code
+        nativeName.textContent = lang.native
+
+        const code = document.createElement("span")
+        code.className = "language-code"
+        code.textContent = lang.code
+
+        btn.appendChild(nativeName)
+        btn.appendChild(code)
+        btn.addEventListener("click", () => chooseLanguage(lang.code))
+        languageGrid.appendChild(btn)
     })
 
-    const heading = document.createElement("div")
-    heading.className = "character-select-heading"
-    heading.textContent = "Avatar"
-
-    const grid = document.createElement("div")
-    grid.className = "character-select-grid"
-
-    AVATAR_CHARACTERS.forEach((character) => {
+    AVATAR_CHARACTERS.forEach((character, i) => {
         const card = document.createElement("button")
-        card.className = "character-card"
         card.type = "button"
+        card.className = "character-card stagger"
+        card.style.setProperty("--i", String(i))
 
         const img = document.createElement("img")
         img.src = character.thumbnail
@@ -391,31 +1250,16 @@ function buildCharacterSelectUI(onSelect) {
         card.appendChild(img)
         card.appendChild(label)
         card.addEventListener("click", () => {
-            if (!select.value) {
-                select.classList.add("needs-choice")
-                select.focus()
-                return
-            }
-            overlay.remove()
-            onSelect(character, select.value)
+            card.classList.add("selected")
+            overlay.classList.add("leaving")
+            setTimeout(() => overlay.remove(), 650)
+            onSelect(character, currentLanguage)
         })
-
-        grid.appendChild(card)
+        avatarGrid.appendChild(card)
     })
 
-    select.addEventListener("change", () => {
-        const texts = I18N[select.value]
-        langLabel.textContent = texts.langLabel
-        heading.textContent = texts.heading
-        select.classList.remove("needs-choice")
-        overlay.classList.remove("locked")
-    })
-
-    overlay.appendChild(langLabel)
-    overlay.appendChild(select)
-    overlay.appendChild(heading)
-    overlay.appendChild(grid)
     document.body.appendChild(overlay)
+    goStep("welcome")
 }
 
 buildBadge()
@@ -442,6 +1286,19 @@ document.body.appendChild(renderer.domElement)
 
 const controls = new OrbitControls(camera, renderer.domElement)
 controls.target.set(0, 1.2, 0)
+
+// The visitor may only turn the view a little and zoom within a small
+// range, so the camera always stays inside the room in front of the avatar.
+controls.enablePan = false
+controls.enableDamping = true
+controls.dampingFactor = 0.08
+controls.rotateSpeed = CAMERA_LIMITS.rotateSpeed
+controls.minDistance = CAMERA_LIMITS.minDistance
+controls.maxDistance = CAMERA_LIMITS.maxDistance
+controls.minAzimuthAngle = CAMERA_LIMITS.minAzimuth
+controls.maxAzimuthAngle = CAMERA_LIMITS.maxAzimuth
+controls.minPolarAngle = CAMERA_LIMITS.minPolar
+controls.maxPolarAngle = CAMERA_LIMITS.maxPolar
 controls.update()
 
 const directionalLight = new THREE.DirectionalLight(0xffffff, 3)
@@ -494,6 +1351,7 @@ function loadClassicAvatar(path) {
 
             setIdlePoseGLB(gltf.scene)
             hideLoadingOverlay()
+            startIntro()
             startIdleBlinking()
 
             setTimeout(() => {
@@ -536,6 +1394,7 @@ function loadVRMAvatar(path) {
 
             setIdlePoseVRM(vrm)
             hideLoadingOverlay()
+            startIntro()
             startIdleBlinking()
 
             setTimeout(() => {
@@ -561,6 +1420,7 @@ buildCharacterSelectUI((character, language) => {
 
     buildLoadingOverlay()
     buildChatUI()
+    buildQrPanels()
     loadAvatar(character)
     startIdleWatch()
 })
@@ -782,10 +1642,15 @@ let currentJaw = 0
 // which is what happens automatically during browser-TTS fallback.
 let externalJawTarget = null
 
-function startLipSync() { isSpeaking = true }
+// The "speaking" class on <body> drives the equalizer bars in the chat UI.
+function startLipSync() {
+    isSpeaking = true
+    document.body.classList.add("speaking")
+}
 function stopLipSync() {
     isSpeaking = false
     externalJawTarget = null
+    document.body.classList.remove("speaking")
 }
 
 // Shared target computation — 0..~0.35 range, same scale your GLB rig's
@@ -825,7 +1690,7 @@ function updateLipSyncVRM(elapsed) {
 // Browser-voice fallback: pick a voice that matches the chosen language.
 function pickVoice() {
     if (!('speechSynthesis' in window)) return null
-    const prefix = currentLanguage === 'en' ? 'en' : 'de'
+    const prefix = currentLanguage || 'de'
     const voices = window.speechSynthesis.getVoices().filter(v => v.lang.startsWith(prefix))
     return (
         voices.find(v => /female|katja|petra|anna|helena|amala|zira|jenny|samantha/i.test(v.name)) ||
@@ -1023,9 +1888,11 @@ function startIdleWatch() {
 // Chat UI
 // ======================
 
-function setSubtitle(text) {
+// While waiting for an answer the bubble pulses (thinking = true).
+function setSubtitle(text, thinking = false) {
     const el = document.getElementById("avatar-subtitle")
     if (!el) return
+    el.classList.toggle("thinking", thinking && !!text)
     if (text) {
         el.textContent = text
         el.classList.add("visible")
@@ -1034,12 +1901,39 @@ function setSubtitle(text) {
     }
 }
 
+// The visitor's last questions appear as small bubbles that fade away.
+function showUserBubble(text) {
+    const host = document.getElementById("bubbles")
+    if (!host) return
+    const bubble = document.createElement("div")
+    bubble.className = "bubble user"
+    bubble.textContent = text
+    host.appendChild(bubble)
+    while (host.children.length > 2) host.firstChild.remove()
+    setTimeout(() => {
+        bubble.classList.add("leaving")
+        setTimeout(() => bubble.remove(), 500)
+    }, FX.bubbleLifetimeMs)
+}
+
 function buildChatUI() {
     const container = document.createElement("div")
     container.id = "chat-ui"
 
+    const bubbles = document.createElement("div")
+    bubbles.id = "bubbles"
+    bubbles.setAttribute("aria-hidden", "true")
+
+    // Equalizer bars, visible only while the avatar speaks.
+    const bars = document.createElement("div")
+    bars.id = "speaking-bars"
+    bars.setAttribute("aria-hidden", "true")
+    for (let i = 0; i < 5; i++) bars.appendChild(document.createElement("span"))
+
     const subtitle = document.createElement("div")
     subtitle.id = "avatar-subtitle"
+    subtitle.setAttribute("role", "status")
+    subtitle.setAttribute("aria-live", "polite")
 
     const row = document.createElement("div")
     row.className = "chat-row"
@@ -1067,15 +1961,18 @@ function buildChatUI() {
     // Tappable example questions, shown until the first question is asked.
     const suggestionsEl = document.createElement("div")
     suggestionsEl.id = "suggestions"
-    t('suggestions').forEach((question) => {
+    t('suggestions').forEach((question, i) => {
         const chip = document.createElement("button")
         chip.className = "suggestion-chip"
         chip.type = "button"
+        chip.style.setProperty("--i", String(i))
         chip.textContent = question
         chip.addEventListener("click", () => handleQuestion(question))
         suggestionsEl.appendChild(chip)
     })
 
+    container.appendChild(bubbles)
+    container.appendChild(bars)
     container.appendChild(subtitle)
     container.appendChild(suggestionsEl)
     container.appendChild(row)
@@ -1086,7 +1983,8 @@ function buildChatUI() {
         suggestionsEl.classList.add("hidden")
         markActivity()
         input.value = ""
-        setSubtitle(t('thinking'))
+        showUserBubble(text)
+        setSubtitle(t('thinking'), true)
         const answer = await getAnswer(text)
         speak(answer)
     }
@@ -1135,10 +2033,53 @@ function buildChatUI() {
 
 const clock = new THREE.Clock()
 
+// Camera motion: a smooth move-in after the avatar loads, then a gentle
+// parallax that follows the pointer (both skipped for reduced motion).
+const INTRO_FROM = new THREE.Vector3(0, 1.6, 4.6)
+const INTRO_TO = new THREE.Vector3(0, 1.4, 3)
+let introStart = null
+
+function startIntro() {
+    if (REDUCED_MOTION) return
+    introStart = clock.getElapsedTime()
+    controls.maxDistance = Infinity // the intro starts a bit farther away than visitors may go
+}
+
+const pointer = { x: 0, y: 0 }
+const parallax = { x: 0, y: 0 }
+window.addEventListener("pointermove", (e) => {
+    pointer.x = (e.clientX / window.innerWidth) * 2 - 1
+    pointer.y = -((e.clientY / window.innerHeight) * 2 - 1)
+}, { passive: true })
+
+function updateCameraMotion(elapsed) {
+    if (introStart !== null) {
+        const p = Math.min((elapsed - introStart) / FX.introDuration, 1)
+        const eased = 1 - Math.pow(1 - p, 3)
+        camera.position.lerpVectors(INTRO_FROM, INTRO_TO, eased)
+        controls.update()
+        if (p >= 1) {
+            introStart = null
+            controls.maxDistance = CAMERA_LIMITS.maxDistance
+        }
+        return
+    }
+
+    if (!REDUCED_MOTION && currentAvatarRoot) {
+        parallax.x += (pointer.x - parallax.x) * FX.parallaxEase
+        parallax.y += (pointer.y - parallax.y) * FX.parallaxEase
+        controls.target.x = parallax.x * FX.parallaxStrength
+        controls.target.y = 1.2 + parallax.y * FX.parallaxStrength * 0.5
+    }
+    controls.update() // needed every frame because of the damping
+}
+
 function animate() {
     requestAnimationFrame(animate)
     const delta = clock.getDelta()
     const elapsed = clock.getElapsedTime()
+
+    updateAtmosphere(delta, elapsed)
 
     if (currentAvatarRoot) {
         applyIdleSway(elapsed)
@@ -1152,6 +2093,8 @@ function animate() {
     if (currentVRM) {
         currentVRM.update(delta)
     }
+
+    updateCameraMotion(elapsed)
 
     renderer.render(scene, camera)
 }

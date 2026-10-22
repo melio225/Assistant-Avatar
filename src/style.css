@@ -38,28 +38,300 @@ canvas {
 }
 
 /* ======================
-   Start screen: language + character select
+   Start flow: welcome -> language -> avatar
    ====================== */
 
 #character-select-overlay {
   position: fixed;
   inset: 0;
   z-index: 60; /* above the loading overlay, since it appears first */
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 40%, var(--teal-600) 0%, var(--ink-900) 100%);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+/* Fade out while the loading screen takes over */
+#character-select-overlay.leaving {
+  opacity: 0;
+  transform: scale(1.04);
+  pointer-events: none;
+}
+
+/* Two slow drifting glows give the background life (transform only, so it stays cheap) */
+#character-select-overlay::before,
+#character-select-overlay::after {
+  content: '';
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.4;
+  animation: blob-drift 18s ease-in-out infinite alternate;
+}
+
+#character-select-overlay::before {
+  top: -25vmax;
+  left: -20vmax;
+  background: radial-gradient(circle, var(--teal-300) 0%, transparent 65%);
+}
+
+#character-select-overlay::after {
+  bottom: -30vmax;
+  right: -20vmax;
+  background: radial-gradient(circle, #00b3b3 0%, transparent 65%);
+  animation-duration: 24s;
+  animation-direction: alternate-reverse;
+}
+
+@keyframes blob-drift {
+  to { transform: translate(8vmax, 6vmax) scale(1.15); }
+}
+
+/* Each step is one screen; only the active one is visible */
+.step {
+  grid-area: 1 / 1;
+  position: relative;
+  z-index: 1;
+  width: min(940px, 94vw);
+  max-height: 100dvh;
+  overflow-y: auto;
+  padding: 28px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 28px;
-  background: radial-gradient(circle at 50% 40%, var(--teal-600) 0%, var(--ink-900) 100%);
+  gap: 22px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(24px) scale(0.98);
+  transition: opacity 0.5s ease, transform 0.5s ease, visibility 0s linear 0.5s;
 }
 
-.character-select-heading {
-  font-family: 'Space Grotesk', sans-serif;
-  font-weight: 600;
-  font-size: 22px;
+.step.active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+  transition: opacity 0.5s ease, transform 0.5s ease, visibility 0s linear 0s;
+}
+
+/* Elements of the active step rise in one after another (--i is set from JavaScript) */
+.step.active .stagger {
+  animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 90ms + 120ms);
+}
+
+.step.active .language-btn.stagger {
+  animation-delay: calc(var(--i, 0) * 45ms + 200ms);
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ---- step 1: welcome ---- */
+
+.welcome-logo {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  padding: 12px;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
+}
+
+.welcome-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* A ring that keeps spreading out from the logo */
+.welcome-logo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 22px;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  animation: logo-ping 2.8s ease-out infinite;
+}
+
+@keyframes logo-ping {
+  from { transform: scale(1); opacity: 0.7; }
+  to   { transform: scale(1.9); opacity: 0; }
+}
+
+.welcome-word-wrap {
+  position: relative;
+  width: 100%;
+  height: 1.3em;
+  font-size: clamp(34px, 9vw, 76px);
+  line-height: 1.3;
+  overflow: hidden;
+  text-align: center;
+  font-family: 'Space Grotesk', 'Inter', 'Noto Sans', system-ui, sans-serif;
+  font-weight: 700;
   color: var(--paper-100);
+}
+
+.welcome-word {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  animation: word-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.welcome-word.out {
+  animation: word-out 0.5s ease both;
+}
+
+@keyframes word-in {
+  from { opacity: 0; transform: translateY(60%); filter: blur(8px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+
+@keyframes word-out {
+  to { opacity: 0; transform: translateY(-60%); filter: blur(8px); }
+}
+
+.start-title {
+  font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  font-size: clamp(18px, 3.4vw, 26px);
+  color: var(--paper-100);
+  text-align: center;
   letter-spacing: 0.01em;
 }
+
+.start-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--teal-300);
+  text-align: center;
+}
+
+.start-btn-wrap {
+  margin-top: 14px;
+}
+
+.start-btn {
+  padding: 16px 40px;
+  border: none;
+  border-radius: 999px;
+  background: var(--paper-100);
+  color: var(--teal-700);
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  animation: btn-pulse 2.4s ease-in-out infinite;
+  transition: transform 0.15s ease;
+}
+
+.start-btn:hover {
+  transform: translateY(-2px) scale(1.03);
+}
+
+@keyframes btn-pulse {
+  0%, 100% { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 0 0 0 rgba(255, 255, 255, 0.4); }
+  50%      { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 0 0 16px rgba(255, 255, 255, 0); }
+}
+
+/* ---- steps 2 and 3: shared ---- */
+
+.step-back {
+  align-self: flex-start;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--paper-100);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.step-back:hover {
+  background: rgba(255, 255, 255, 0.22);
+  transform: translateX(-2px);
+}
+
+[dir="rtl"] .step-back {
+  transform: scaleX(-1);
+}
+
+.step-title {
+  font-family: 'Space Grotesk', 'Inter', 'Noto Sans', system-ui, sans-serif;
+  font-weight: 600;
+  font-size: clamp(22px, 4vw, 30px);
+  color: var(--paper-100);
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+/* ---- step 2: language buttons ---- */
+
+.language-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.language-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: var(--glass);
+  color: var(--ink-900);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.language-btn:hover {
+  transform: translateY(-3px);
+  border-color: var(--teal-300);
+  box-shadow: 0 10px 26px rgba(16, 32, 31, 0.28);
+}
+
+.language-btn.selected {
+  border-color: var(--teal-300);
+  box-shadow: 0 0 0 3px rgba(127, 208, 208, 0.5);
+}
+
+.language-native {
+  font-family: 'Inter', 'Noto Sans', system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 19px;
+}
+
+.language-code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--teal-700);
+}
+
+/* ---- step 3: avatar cards ---- */
 
 .character-select-grid {
   display: flex;
@@ -69,82 +341,35 @@ canvas {
   max-width: 90vw;
 }
 
-/* Language picker — required before an avatar can be chosen */
-.language-label {
-  font-family: 'Space Grotesk', sans-serif;
-  font-weight: 600;
-  font-size: 16px;
-  color: var(--paper-100);
-  letter-spacing: 0.01em;
-  margin-bottom: -16px; /* pulls the label closer to its dropdown, offsetting the flex gap */
-}
-
-.language-select {
-  min-width: 240px;
-  padding: 13px 44px 13px 18px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background-color: var(--glass);
-  font-family: 'Inter', sans-serif;
-  font-size: 14.5px;
-  font-weight: 500;
-  color: var(--ink-900);
-  cursor: pointer;
-  outline: none;
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23007373' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 18px center;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.language-select:focus {
-  border-color: var(--teal-300);
-  box-shadow: 0 0 0 3px rgba(127, 208, 208, 0.35);
-}
-
-/* Shown when someone clicks an avatar before choosing a language */
-.language-select.needs-choice {
-  border-color: #ffb4a8;
-  box-shadow: 0 0 0 3px rgba(255, 180, 168, 0.45);
-}
-
 .character-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  width: 160px;
+  width: 170px;
   padding: 16px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.25);
   background: var(--glass);
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .character-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-4px);
   border-color: var(--teal-300);
-  box-shadow: 0 10px 28px rgba(16, 32, 31, 0.28);
+  box-shadow: 0 12px 30px rgba(16, 32, 31, 0.3);
 }
 
-/* Avatars look locked until a language is chosen (they stay clickable
-   so the click can point the person at the language dropdown). */
-#character-select-overlay.locked .character-card {
-  opacity: 0.4;
-}
-
-#character-select-overlay.locked .character-card:hover {
-  transform: none;
-  border-color: rgba(255, 255, 255, 0.25);
-  box-shadow: none;
+.character-card.selected {
+  transform: translateY(-4px) scale(1.04);
+  border-color: var(--teal-300);
+  box-shadow: 0 0 0 3px rgba(127, 208, 208, 0.55), 0 14px 34px rgba(16, 32, 31, 0.35);
 }
 
 .character-card img {
   width: 100%;
-  height: 140px;
+  height: 150px;
   object-fit: cover;
   border-radius: 10px;
   background: rgba(16, 32, 31, 0.15); /* visible placeholder if thumbnail is missing */
@@ -153,16 +378,18 @@ canvas {
 .character-card-label {
   font-family: 'Inter', sans-serif;
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--ink-900);
   text-align: center;
 }
 
 @media (max-width: 560px) {
-  .character-select-heading { font-size: 18px; }
-  .character-card { width: 130px; padding: 12px; }
-  .character-card img { height: 110px; }
-  .language-select { min-width: 200px; font-size: 14px; }
+  .step { gap: 16px; padding: 20px 10px; }
+  .language-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .language-btn { padding: 13px 8px; }
+  .language-native { font-size: 17px; }
+  .character-card { width: 138px; padding: 12px; }
+  .character-card img { height: 118px; }
 }
 
 /* ======================
@@ -198,6 +425,7 @@ canvas {
 }
 
 .loading-text {
+  animation: fade-pulse 1.8s ease-in-out infinite;
   font-family: 'JetBrains Mono', monospace;
   font-size: 11.5px;
   letter-spacing: 0.16em;
@@ -207,6 +435,11 @@ canvas {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+@keyframes fade-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
 }
 
 /* ======================
@@ -351,7 +584,7 @@ canvas {
 }
 
 .chat-btn:active {
-  transform: translateY(0);
+  transform: scale(0.94);
 }
 
 #mic-btn {
@@ -400,6 +633,86 @@ canvas {
 }
 
 /* ======================
+   Question bubbles, speaking bars, thinking state
+   ====================== */
+
+#bubbles {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.bubble {
+  max-width: 80%;
+  padding: 8px 14px;
+  border-radius: 16px 16px 4px 16px;
+  background: var(--teal-700);
+  color: var(--paper-100);
+  font-size: 13.5px;
+  line-height: 1.35;
+  box-shadow: 0 6px 18px rgba(16, 32, 31, 0.18);
+  animation: bubble-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.bubble.leaving {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+@keyframes bubble-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.96); }
+}
+
+/* Equalizer bars: only visible while the avatar speaks (body.speaking) */
+#speaking-bars {
+  align-self: center;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: height 0.25s ease, opacity 0.25s ease;
+}
+
+body.speaking #speaking-bars {
+  height: 20px;
+  opacity: 1;
+}
+
+#speaking-bars span {
+  width: 4px;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--teal-700);
+  transform-origin: bottom;
+  animation: eq 0.9s ease-in-out infinite;
+}
+
+#speaking-bars span:nth-child(2) { animation-delay: 0.15s; }
+#speaking-bars span:nth-child(3) { animation-delay: 0.3s; }
+#speaking-bars span:nth-child(4) { animation-delay: 0.45s; }
+#speaking-bars span:nth-child(5) { animation-delay: 0.6s; }
+
+@keyframes eq {
+  0%, 100% { transform: scaleY(0.25); }
+  50%      { transform: scaleY(1); }
+}
+
+/* Waiting for an answer: the bubble pulses softly */
+#avatar-subtitle.thinking {
+  animation: think-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes think-pulse {
+  0%, 100% { box-shadow: 0 8px 24px rgba(16, 32, 31, 0.12); border-left-color: var(--teal-600); }
+  50%      { box-shadow: 0 8px 30px rgba(0, 152, 152, 0.4);  border-left-color: var(--teal-300); }
+}
+
+/* ======================
    Suggested questions
    ====================== */
 
@@ -415,6 +728,8 @@ canvas {
 }
 
 .suggestion-chip {
+  animation: rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 70ms + 300ms);
   padding: 9px 14px;
   border-radius: 999px;
   border: 1px solid rgba(0, 152, 152, 0.35);
@@ -455,6 +770,14 @@ canvas {
 #idle-overlay.visible {
   opacity: 1;
   visibility: visible;
+}
+
+#idle-overlay.visible .idle-card {
+  animation: pop 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.94); }
 }
 
 .idle-card {
@@ -502,6 +825,120 @@ canvas {
 }
 
 /* ======================
+   Ernst App promotion (QR code on the right side)
+   ====================== */
+
+#app-promo {
+  position: fixed;
+  right: 22px;
+  top: 50%;
+  z-index: 10;
+  width: 176px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  border-radius: 16px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(0, 152, 152, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 10px 28px rgba(16, 32, 31, 0.16);
+  text-decoration: none;
+  color: var(--ink-900);
+  transform: translateY(-50%);
+  animation: promo-in 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 1.2s backwards,
+             promo-float 7s ease-in-out 2s infinite;
+}
+
+#app-promo:hover {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 14px 34px rgba(0, 152, 152, 0.3);
+}
+
+@keyframes promo-in {
+  from { opacity: 0; transform: translate(30px, -50%); }
+}
+
+@keyframes promo-float {
+  0%, 100% { transform: translateY(-50%); }
+  50%      { transform: translateY(calc(-50% - 6px)); }
+}
+
+.app-promo-title {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--teal-700);
+}
+
+.app-promo-qr {
+  width: 128px;
+  height: 128px;
+  padding: 6px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(16, 32, 31, 0.12);
+}
+
+.app-promo-qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.app-promo-text {
+  font-size: 12.5px;
+  line-height: 1.35;
+  text-align: center;
+  color: var(--ink-600);
+}
+
+.app-promo-url {
+  max-width: 100%;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--teal-700);
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+/* Right-to-left languages (Arabic): mirror the accents */
+[dir="rtl"] #avatar-subtitle {
+  border-left: none;
+  border-right: 3px solid var(--teal-600);
+}
+
+[dir="rtl"] #app-promo {
+  right: auto;
+  left: 22px;
+}
+
+/* On small screens only a compact link remains, below the university badge */
+@media (max-width: 760px) {
+  #app-promo {
+    top: 78px;
+    left: 16px;
+    right: auto;
+    width: auto;
+    padding: 8px 14px;
+    flex-direction: row;
+    gap: 8px;
+    transform: none;
+    animation: promo-in-small 0.6s ease 1.2s backwards;
+  }
+  [dir="rtl"] #app-promo { left: auto; right: 16px; }
+  .app-promo-qr, .app-promo-text, .app-promo-url { display: none; }
+  .app-promo-title { font-size: 14px; }
+  .app-promo-title::after { content: ' ↗'; }
+}
+
+@keyframes promo-in-small {
+  from { opacity: 0; transform: translateY(-8px); }
+}
+
+/* ======================
    Responsive + accessibility floor
    ====================== */
 
@@ -518,6 +955,9 @@ canvas {
   #chat-ui { bottom: 16px; }
   #send-btn { padding: 0 16px; font-size: 13px; }
   .suggestion-chip { font-size: 12px; padding: 8px 12px; }
+  #character-select-overlay { gap: 18px; }
+  .start-title { font-size: 26px; margin-bottom: -8px; }
+  .start-sub { font-size: 10px; letter-spacing: 0.1em; padding: 0 16px; }
 }
 
 :focus-visible {
@@ -528,6 +968,7 @@ canvas {
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }

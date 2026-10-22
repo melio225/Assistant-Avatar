@@ -139,9 +139,40 @@ Guidelines:
 - If you don't know a specific detail, say so honestly and recommend checking eah-jena.de instead of guessing.`
 }
 
+// Supported languages (code -> English name). The frontend sends the code
+// with every chat and TTS request. To add a language, add one line here and
+// the matching entry in the frontend (LANGUAGES and I18N in main.js).
+// German and English have their own hand-written prompts above; all other
+// languages use the English prompt plus an instruction to answer in that
+// language.
+const LANGUAGE_NAMES = {
+    de: "German",
+    en: "English",
+    fr: "French",
+    es: "Spanish",
+    it: "Italian",
+    pt: "Portuguese",
+    nl: "Dutch",
+    pl: "Polish",
+    tr: "Turkish",
+    ru: "Russian",
+    uk: "Ukrainian",
+    ar: "Arabic",
+    zh: "Chinese (Simplified)",
+    ja: "Japanese"
+}
+
 // Anything unknown or missing falls back to German.
 function normalizeLanguage(language) {
-    return language === "en" ? "en" : "de"
+    return LANGUAGE_NAMES[language] ? language : "de"
+}
+
+function basePrompt(lang) {
+    if (lang === "de" || lang === "en") return SYSTEM_PROMPTS[lang]
+    return SYSTEM_PROMPTS.en.replace(
+        "Always answer in English, even if the question is asked in German.",
+        `Always answer in ${LANGUAGE_NAMES[lang]}, even if the question is asked in another language.`
+    )
 }
 
 // ======================
@@ -188,9 +219,11 @@ const KNOWLEDGE_INTRO = {
 }
 
 function buildSystemPrompt(lang) {
+    const base = basePrompt(lang)
     const knowledge = getKnowledge()
-    if (!knowledge) return SYSTEM_PROMPTS[lang]
-    return `${SYSTEM_PROMPTS[lang]}\n\n${KNOWLEDGE_INTRO[lang]}\n\n${knowledge}`
+    if (!knowledge) return base
+    const intro = KNOWLEDGE_INTRO[lang] || KNOWLEDGE_INTRO.en
+    return `${base}\n\n${intro}\n\n${knowledge}`
 }
 
 app.get("/", (req, res) => {
