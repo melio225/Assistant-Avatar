@@ -80,16 +80,16 @@ let currentLanguage = null // language code, set on the start screen
 const IDLE_TIMEOUT_MS = 3 * 60 * 1000 // total idle time before the reset
 const IDLE_WARNING_S = 20             // the warning is shown for the last N seconds
 
-// Two QR cards on the right side of the scene:
+// QR codes. They are shown on the big screen on the wall behind the avatar
+// (rotating slides) and, on small or portrait screens, as link chips.
 //  - APP_QR:  the Ernst App. The QR code is a PICTURE you provide
 //             (public/images/ernst-app-qr.png); it is shown as it is and
 //             nothing is generated. Replace the file to change it. "url" is
-//             optional: if set, the card (and the small chip on phones)
-//             becomes a link; if empty, the chip is hidden on phones because
-//             only the picture exists. If the picture is missing, the card
-//             hides itself.
+//             optional and used for the link chip on phones; if it is empty
+//             that chip is hidden. If the picture is missing, its slide is
+//             skipped.
 //  - SITE_QR: the official website. This QR code is generated in the
-//             browser from the URL. Set the url to "" to hide the card.
+//             browser from the URL. Set the url to "" to hide it.
 const APP_QR = {
     title: "Ernst App",
     image: "/images/ernst-app-qr.png",
@@ -153,7 +153,24 @@ const I18N = {
         "idleStay": "I'm still here",
         "appText": "Scan the QR code to download the app",
         "siteLabel": "Website",
-        "siteText": "Scan the QR code to visit the website"
+        "siteText": "Scan the QR code to visit the website",
+        "stopTitle": "Stop talking",
+        "slideNumbersTitle": "EAH Jena in numbers",
+        "statFounded": "founded",
+        "statStudents": "students",
+        "statPrograms": "degree programs",
+        "slideAreasTitle": "Four areas of study",
+        "areaTech": "Technology",
+        "areaBusiness": "Business",
+        "areaSocial": "Social work",
+        "areaHealth": "Health",
+        "slideApplyTitle": "Thinking of applying?",
+        "applyText": "Most programs have no admission restrictions, and many are free of tuition fees.",
+        "applyWinter": "Winter semester",
+        "applySummer": "Summer semester",
+        "applyNote": "Usual deadlines. Exact dates are on each program's page.",
+        "slideAskTitle": "Ask me anything",
+        "askText": "Tap a suggested question or use the microphone."
     },
     "de": {
         "welcome": "Willkommen",
@@ -180,7 +197,24 @@ const I18N = {
         "idleStay": "Ich bin noch da",
         "appText": "QR-Code scannen und die App herunterladen",
         "siteLabel": "Webseite",
-        "siteText": "QR-Code scannen und die Website besuchen"
+        "siteText": "QR-Code scannen und die Website besuchen",
+        "stopTitle": "Sprechen stoppen",
+        "slideNumbersTitle": "EAH Jena in Zahlen",
+        "statFounded": "gegründet",
+        "statStudents": "Studierende",
+        "statPrograms": "Studiengänge",
+        "slideAreasTitle": "Vier Studienbereiche",
+        "areaTech": "Technik",
+        "areaBusiness": "Wirtschaft",
+        "areaSocial": "Soziales",
+        "areaHealth": "Gesundheit",
+        "slideApplyTitle": "Du willst dich bewerben?",
+        "applyText": "Die meisten Studiengänge sind zulassungsfrei, viele auch gebührenfrei.",
+        "applyWinter": "Wintersemester",
+        "applySummer": "Sommersemester",
+        "applyNote": "Übliche Fristen. Genaue Termine stehen auf der Seite des Studiengangs.",
+        "slideAskTitle": "Frag mich etwas",
+        "askText": "Tippe auf eine Beispielfrage oder nutze das Mikrofon."
     },
     "fr": {
         "welcome": "Bienvenue",
@@ -207,7 +241,24 @@ const I18N = {
         "idleStay": "Je suis toujours là",
         "appText": "Scannez le code QR pour télécharger l'appli",
         "siteLabel": "Site web",
-        "siteText": "Scannez le code QR pour visiter le site web"
+        "siteText": "Scannez le code QR pour visiter le site web",
+        "stopTitle": "Arrêter la parole",
+        "slideNumbersTitle": "L'EAH Jena en chiffres",
+        "statFounded": "fondée",
+        "statStudents": "étudiants",
+        "statPrograms": "filières",
+        "slideAreasTitle": "Quatre domaines d'études",
+        "areaTech": "Technique",
+        "areaBusiness": "Économie",
+        "areaSocial": "Social",
+        "areaHealth": "Santé",
+        "slideApplyTitle": "Envie de postuler ?",
+        "applyText": "La plupart des filières sont sans restriction d'admission, et beaucoup sont sans frais de scolarité.",
+        "applyWinter": "Semestre d'hiver",
+        "applySummer": "Semestre d'été",
+        "applyNote": "Délais habituels. Les dates exactes figurent sur la page de chaque filière.",
+        "slideAskTitle": "Posez-moi vos questions",
+        "askText": "Touchez une question suggérée ou utilisez le microphone."
     },
     "es": {
         "welcome": "Bienvenido",
@@ -234,7 +285,24 @@ const I18N = {
         "idleStay": "Sigo aquí",
         "appText": "Escanea el código QR para descargar la app",
         "siteLabel": "Sitio web",
-        "siteText": "Escanea el código QR para visitar el sitio web"
+        "siteText": "Escanea el código QR para visitar el sitio web",
+        "stopTitle": "Detener la voz",
+        "slideNumbersTitle": "La EAH Jena en cifras",
+        "statFounded": "fundada",
+        "statStudents": "estudiantes",
+        "statPrograms": "titulaciones",
+        "slideAreasTitle": "Cuatro áreas de estudio",
+        "areaTech": "Tecnología",
+        "areaBusiness": "Economía",
+        "areaSocial": "Trabajo social",
+        "areaHealth": "Salud",
+        "slideApplyTitle": "¿Quieres solicitar plaza?",
+        "applyText": "La mayoría de las titulaciones no tienen restricciones de admisión y muchas no cobran tasas.",
+        "applyWinter": "Semestre de invierno",
+        "applySummer": "Semestre de verano",
+        "applyNote": "Plazos habituales. Las fechas exactas están en la página de cada titulación.",
+        "slideAskTitle": "Pregúntame lo que quieras",
+        "askText": "Toca una pregunta sugerida o usa el micrófono."
     },
     "it": {
         "welcome": "Benvenuto",
@@ -261,7 +329,24 @@ const I18N = {
         "idleStay": "Sono ancora qui",
         "appText": "Scansiona il codice QR per scaricare l'app",
         "siteLabel": "Sito web",
-        "siteText": "Scansiona il codice QR per visitare il sito web"
+        "siteText": "Scansiona il codice QR per visitare il sito web",
+        "stopTitle": "Interrompi la voce",
+        "slideNumbersTitle": "La EAH Jena in cifre",
+        "statFounded": "fondata",
+        "statStudents": "studenti",
+        "statPrograms": "corsi di studio",
+        "slideAreasTitle": "Quattro aree di studio",
+        "areaTech": "Tecnica",
+        "areaBusiness": "Economia",
+        "areaSocial": "Sociale",
+        "areaHealth": "Salute",
+        "slideApplyTitle": "Vuoi candidarti?",
+        "applyText": "La maggior parte dei corsi è ad accesso libero e molti sono senza tasse universitarie.",
+        "applyWinter": "Semestre invernale",
+        "applySummer": "Semestre estivo",
+        "applyNote": "Scadenze abituali. Le date esatte sono sulla pagina di ogni corso.",
+        "slideAskTitle": "Chiedimi qualsiasi cosa",
+        "askText": "Tocca una domanda suggerita o usa il microfono."
     },
     "pt": {
         "welcome": "Bem-vindo",
@@ -288,7 +373,24 @@ const I18N = {
         "idleStay": "Ainda estou aqui",
         "appText": "Leia o código QR para descarregar a app",
         "siteLabel": "Site",
-        "siteText": "Leia o código QR para visitar o site"
+        "siteText": "Leia o código QR para visitar o site",
+        "stopTitle": "Parar a fala",
+        "slideNumbersTitle": "A EAH Jena em números",
+        "statFounded": "fundada",
+        "statStudents": "estudantes",
+        "statPrograms": "cursos",
+        "slideAreasTitle": "Quatro áreas de estudo",
+        "areaTech": "Tecnologia",
+        "areaBusiness": "Economia",
+        "areaSocial": "Serviço social",
+        "areaHealth": "Saúde",
+        "slideApplyTitle": "Quer candidatar-se?",
+        "applyText": "A maioria dos cursos não tem restrições de admissão e muitos não têm propinas.",
+        "applyWinter": "Semestre de inverno",
+        "applySummer": "Semestre de verão",
+        "applyNote": "Prazos habituais. As datas exatas estão na página de cada curso.",
+        "slideAskTitle": "Pergunte-me o que quiser",
+        "askText": "Toque numa pergunta sugerida ou use o microfone."
     },
     "nl": {
         "welcome": "Welkom",
@@ -315,7 +417,24 @@ const I18N = {
         "idleStay": "Ik ben er nog",
         "appText": "Scan de QR-code om de app te downloaden",
         "siteLabel": "Website",
-        "siteText": "Scan de QR-code om de website te bezoeken"
+        "siteText": "Scan de QR-code om de website te bezoeken",
+        "stopTitle": "Stop met praten",
+        "slideNumbersTitle": "EAH Jena in cijfers",
+        "statFounded": "opgericht",
+        "statStudents": "studenten",
+        "statPrograms": "opleidingen",
+        "slideAreasTitle": "Vier studiegebieden",
+        "areaTech": "Techniek",
+        "areaBusiness": "Economie",
+        "areaSocial": "Sociaal werk",
+        "areaHealth": "Gezondheid",
+        "slideApplyTitle": "Wil je je aanmelden?",
+        "applyText": "De meeste opleidingen hebben geen toelatingsbeperking en veel zijn zonder collegegeld.",
+        "applyWinter": "Wintersemester",
+        "applySummer": "Zomersemester",
+        "applyNote": "Gebruikelijke deadlines. Exacte data staan op de pagina van elke opleiding.",
+        "slideAskTitle": "Stel me een vraag",
+        "askText": "Tik op een voorbeeldvraag of gebruik de microfoon."
     },
     "pl": {
         "welcome": "Witamy",
@@ -342,7 +461,24 @@ const I18N = {
         "idleStay": "Nadal tu jestem",
         "appText": "Zeskanuj kod QR, aby pobrać aplikację",
         "siteLabel": "Strona",
-        "siteText": "Zeskanuj kod QR, aby odwiedzić stronę"
+        "siteText": "Zeskanuj kod QR, aby odwiedzić stronę",
+        "stopTitle": "Zatrzymaj mowę",
+        "slideNumbersTitle": "EAH Jena w liczbach",
+        "statFounded": "założona",
+        "statStudents": "studentów",
+        "statPrograms": "kierunków",
+        "slideAreasTitle": "Cztery obszary studiów",
+        "areaTech": "Technika",
+        "areaBusiness": "Ekonomia",
+        "areaSocial": "Praca socjalna",
+        "areaHealth": "Zdrowie",
+        "slideApplyTitle": "Chcesz aplikować?",
+        "applyText": "Większość kierunków nie ma ograniczeń przyjęć, a wiele jest bez czesnego.",
+        "applyWinter": "Semestr zimowy",
+        "applySummer": "Semestr letni",
+        "applyNote": "Zwykłe terminy. Dokładne daty są na stronie kierunku.",
+        "slideAskTitle": "Zapytaj mnie o cokolwiek",
+        "askText": "Dotknij proponowanego pytania lub użyj mikrofonu."
     },
     "tr": {
         "welcome": "Hoş geldiniz",
@@ -369,7 +505,24 @@ const I18N = {
         "idleStay": "Buradayım",
         "appText": "Uygulamayı indirmek için QR kodu tarayın",
         "siteLabel": "Web sitesi",
-        "siteText": "Web sitesini ziyaret etmek için QR kodu tarayın"
+        "siteText": "Web sitesini ziyaret etmek için QR kodu tarayın",
+        "stopTitle": "Konuşmayı durdur",
+        "slideNumbersTitle": "Sayılarla EAH Jena",
+        "statFounded": "kuruluş",
+        "statStudents": "öğrenci",
+        "statPrograms": "program",
+        "slideAreasTitle": "Dört çalışma alanı",
+        "areaTech": "Teknik",
+        "areaBusiness": "İşletme",
+        "areaSocial": "Sosyal hizmet",
+        "areaHealth": "Sağlık",
+        "slideApplyTitle": "Başvurmak mı istiyorsunuz?",
+        "applyText": "Programların çoğunda kabul kısıtlaması yoktur ve birçoğu harçsızdır.",
+        "applyWinter": "Güz dönemi",
+        "applySummer": "Bahar dönemi",
+        "applyNote": "Olağan son tarihler. Kesin tarihler her programın sayfasındadır.",
+        "slideAskTitle": "Bana her şeyi sorun",
+        "askText": "Önerilen bir soruya dokunun veya mikrofonu kullanın."
     },
     "ru": {
         "welcome": "Добро пожаловать",
@@ -396,7 +549,24 @@ const I18N = {
         "idleStay": "Я здесь",
         "appText": "Отсканируйте QR-код, чтобы скачать приложение",
         "siteLabel": "Сайт",
-        "siteText": "Отсканируйте QR-код, чтобы открыть сайт"
+        "siteText": "Отсканируйте QR-код, чтобы открыть сайт",
+        "stopTitle": "Остановить речь",
+        "slideNumbersTitle": "EAH Jena в цифрах",
+        "statFounded": "основана",
+        "statStudents": "студентов",
+        "statPrograms": "программ обучения",
+        "slideAreasTitle": "Четыре направления обучения",
+        "areaTech": "Техника",
+        "areaBusiness": "Экономика",
+        "areaSocial": "Социальная работа",
+        "areaHealth": "Здравоохранение",
+        "slideApplyTitle": "Хотите поступить?",
+        "applyText": "Большинство программ без ограничений при приёме, многие бесплатные.",
+        "applyWinter": "Зимний семестр",
+        "applySummer": "Летний семестр",
+        "applyNote": "Обычные сроки. Точные даты указаны на странице программы.",
+        "slideAskTitle": "Спросите меня о чём угодно",
+        "askText": "Нажмите на подсказку или используйте микрофон."
     },
     "uk": {
         "welcome": "Ласкаво просимо",
@@ -423,7 +593,24 @@ const I18N = {
         "idleStay": "Я тут",
         "appText": "Скануйте QR-код, щоб завантажити застосунок",
         "siteLabel": "Вебсайт",
-        "siteText": "Скануйте QR-код, щоб відкрити вебсайт"
+        "siteText": "Скануйте QR-код, щоб відкрити вебсайт",
+        "stopTitle": "Зупинити мовлення",
+        "slideNumbersTitle": "EAH Jena в цифрах",
+        "statFounded": "заснована",
+        "statStudents": "студентів",
+        "statPrograms": "програм навчання",
+        "slideAreasTitle": "Чотири напрями навчання",
+        "areaTech": "Техніка",
+        "areaBusiness": "Економіка",
+        "areaSocial": "Соціальна робота",
+        "areaHealth": "Охорона здоров'я",
+        "slideApplyTitle": "Хочете вступити?",
+        "applyText": "Більшість програм без обмежень при вступі, багато з них безкоштовні.",
+        "applyWinter": "Зимовий семестр",
+        "applySummer": "Літній семестр",
+        "applyNote": "Звичайні терміни. Точні дати вказані на сторінці програми.",
+        "slideAskTitle": "Запитайте мене про що завгодно",
+        "askText": "Торкніться підказки або скористайтеся мікрофоном."
     },
     "ar": {
         "welcome": "مرحباً بكم",
@@ -450,7 +637,24 @@ const I18N = {
         "idleStay": "ما زلت هنا",
         "appText": "امسح رمز QR لتحميل التطبيق",
         "siteLabel": "الموقع",
-        "siteText": "امسح رمز QR لزيارة الموقع الإلكتروني"
+        "siteText": "امسح رمز QR لزيارة الموقع الإلكتروني",
+        "stopTitle": "إيقاف الكلام",
+        "slideNumbersTitle": "EAH Jena بالأرقام",
+        "statFounded": "تأسست",
+        "statStudents": "طالب",
+        "statPrograms": "برنامج دراسي",
+        "slideAreasTitle": "أربعة مجالات للدراسة",
+        "areaTech": "التقنية",
+        "areaBusiness": "الاقتصاد",
+        "areaSocial": "العمل الاجتماعي",
+        "areaHealth": "الصحة",
+        "slideApplyTitle": "هل تفكر في التقديم؟",
+        "applyText": "معظم البرامج بلا قيود قبول، والعديد منها بلا رسوم دراسية.",
+        "applyWinter": "الفصل الشتوي",
+        "applySummer": "الفصل الصيفي",
+        "applyNote": "المواعيد المعتادة. المواعيد الدقيقة في صفحة كل برنامج.",
+        "slideAskTitle": "اسألني أي شيء",
+        "askText": "المس سؤالاً مقترحاً أو استخدم الميكروفون."
     },
     "zh": {
         "welcome": "欢迎",
@@ -477,7 +681,24 @@ const I18N = {
         "idleStay": "我还在",
         "appText": "扫描二维码下载应用",
         "siteLabel": "官网",
-        "siteText": "扫描二维码访问网站"
+        "siteText": "扫描二维码访问网站",
+        "stopTitle": "停止说话",
+        "slideNumbersTitle": "数字看 EAH Jena",
+        "statFounded": "成立",
+        "statStudents": "学生",
+        "statPrograms": "学位项目",
+        "slideAreasTitle": "四大学习领域",
+        "areaTech": "技术",
+        "areaBusiness": "经济",
+        "areaSocial": "社会工作",
+        "areaHealth": "健康",
+        "slideApplyTitle": "想申请吗？",
+        "applyText": "大多数专业无入学限制，许多专业免学费。",
+        "applyWinter": "冬季学期",
+        "applySummer": "夏季学期",
+        "applyNote": "常规截止日期，具体日期请见各专业页面。",
+        "slideAskTitle": "有问题尽管问",
+        "askText": "点击推荐问题或使用麦克风。"
     },
     "ja": {
         "welcome": "ようこそ",
@@ -504,7 +725,24 @@ const I18N = {
         "idleStay": "まだいます",
         "appText": "QRコードを読み取ってアプリをダウンロード",
         "siteLabel": "ウェブサイト",
-        "siteText": "QRコードを読み取ってウェブサイトへ"
+        "siteText": "QRコードを読み取ってウェブサイトへ",
+        "stopTitle": "話すのを止める",
+        "slideNumbersTitle": "数字で見る EAH Jena",
+        "statFounded": "設立",
+        "statStudents": "学生",
+        "statPrograms": "学位プログラム",
+        "slideAreasTitle": "4つの学習分野",
+        "areaTech": "技術",
+        "areaBusiness": "経済",
+        "areaSocial": "社会福祉",
+        "areaHealth": "健康",
+        "slideApplyTitle": "出願をお考えですか？",
+        "applyText": "ほとんどのプログラムは入学制限がなく、多くは授業料も無料です。",
+        "applyWinter": "冬学期",
+        "applySummer": "夏学期",
+        "applyNote": "通常の締切です。正確な日付は各プログラムのページをご覧ください。",
+        "slideAskTitle": "なんでも聞いてください",
+        "askText": "おすすめの質問をタップするか、マイクを使ってください。"
     }
 }
 
@@ -615,7 +853,9 @@ const TTS_ENDPOINT = `${API_BASE_URL}/api/tts`
 
 let conversationHistory = []
 
-async function getAnswer(question) {
+// Returns the answer, or null if the request was cancelled (a newer question
+// replaced it, or the visitor pressed stop).
+async function getAnswer(question, signal) {
     try {
         const response = await fetch(CHAT_ENDPOINT, {
             method: "POST",
@@ -624,7 +864,8 @@ async function getAnswer(question) {
                 question,
                 history: conversationHistory,
                 language: currentLanguage
-            })
+            }),
+            signal
         })
 
         if (!response.ok) throw new Error("Backend returned " + response.status)
@@ -641,6 +882,7 @@ async function getAnswer(question) {
         return data.answer
 
     } catch (err) {
+        if (err.name === "AbortError") return null
         console.warn("Backend unreachable, using local FAQ fallback:", err)
         return findAnswer(question)
     }
@@ -854,6 +1096,527 @@ function addRoom() {
 
 addRoom()
 
+// ======================
+// Big screen on the back wall
+// ======================
+//
+// A large screen hangs on the wall behind the avatar and rotates through
+// slides: the website QR code, the Ernst App QR picture and a few general
+// facts. Each slide is painted once into its own canvas (in the chosen
+// language); the screen only cross-fades between them, so it costs almost
+// nothing while a slide is showing. The content sits on the left and the
+// right, which leaves the middle free for the avatar standing in front.
+// On small or portrait screens the screen would be too small to read; there
+// the QR codes appear as link chips instead (see buildQrChips).
+
+const SCREEN = {
+    w: 3.3, h: 1.3, y: 1.25,       // size and height of the screen in the room (low enough to clear the badge)
+    canvasW: 1584, canvasH: 624,   // painting resolution (same proportions as w x h)
+    slideSeconds: 8,               // how long each slide stays
+    fadeSeconds: 0.8,              // cross-fade between slides
+    leftX: 60, rightX: 1024,       // the two content zones (px on the canvas)
+    zoneW: 500
+}
+
+const FONT_HEAD = '"Space Grotesk","Inter","Noto Sans",system-ui,sans-serif'
+const FONT_BODY = '"Inter","Noto Sans",system-ui,sans-serif'
+const FONT_MONO = '"JetBrains Mono",ui-monospace,monospace'
+
+const screenState = {
+    group: null,     // the meshes of the screen
+    ctx: null,       // the canvas the visitor sees
+    texture: null,
+    slides: [],      // one painted canvas per slide
+    index: 0,
+    shownAt: 0,
+    fade: null,      // { from, to, start, progress } while cross-fading
+    active: false
+}
+
+// Pictures used on the screen: the university logo and the Ernst App QR picture.
+const screenLogo = new Image()
+screenLogo.addEventListener("load", () => rebuildScreenSlides())
+screenLogo.src = eahLogoUrl
+
+const screenAppQr = new Image()
+let screenAppQrReady = false
+if (APP_QR.image) {
+    screenAppQr.addEventListener("load", () => {
+        screenAppQrReady = true
+        rebuildScreenSlides()
+    })
+    screenAppQr.src = APP_QR.image // if the file is missing the slide is simply skipped
+}
+
+function isRtl() {
+    const lang = LANGUAGES.find(l => l.code === currentLanguage)
+    return !!(lang && lang.rtl)
+}
+
+// ---- small painting helpers ----
+
+function roundedRect(g, x, y, w, h, r) {
+    g.beginPath()
+    g.moveTo(x + r, y)
+    g.arcTo(x + w, y, x + w, y + h, r)
+    g.arcTo(x + w, y + h, x, y + h, r)
+    g.arcTo(x, y + h, x, y, r)
+    g.arcTo(x, y, x + w, y, r)
+    g.closePath()
+}
+
+// Where text starts inside a zone: the left edge, or the right edge for Arabic.
+function zoneAnchor(start) {
+    return isRtl() ? start + SCREEN.zoneW : start
+}
+
+function setTextDirection(g) {
+    g.textAlign = isRtl() ? "right" : "left"
+    g.direction = isRtl() ? "rtl" : "ltr"
+    g.textBaseline = "alphabetic"
+}
+
+// Shrinks the font until the text fits the width (keeps long translations inside their zone).
+function fitFont(g, text, weight, family, maxW, startPx, minPx) {
+    let px = startPx
+    g.font = `${weight} ${px}px ${family}`
+    while (px > minPx && g.measureText(text).width > maxW) {
+        px -= 2
+        g.font = `${weight} ${px}px ${family}`
+    }
+    return px
+}
+
+// Word wrap that also works for Chinese and Japanese (no spaces: every
+// character may start a new line).
+function wrapLines(g, text, maxW) {
+    const tokens = text.match(/[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]|[^\s\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]+|\s+/g) || []
+    const lines = []
+    let line = ""
+    for (const tok of tokens) {
+        const test = line + tok
+        if (g.measureText(test.trim()).width > maxW && line.trim()) {
+            lines.push(line.trim())
+            line = tok.trimStart()
+        } else {
+            line = test
+        }
+    }
+    if (line.trim()) lines.push(line.trim())
+    return lines
+}
+
+// Draws wrapped text and returns the y position below the last line.
+function paintParagraph(g, text, x, y, maxW, lineH) {
+    const lines = wrapLines(g, text, maxW)
+    lines.forEach((line, k) => g.fillText(line, x, y + k * lineH))
+    return y + lines.length * lineH
+}
+
+function drawQrMatrix(g, url, x, y, size) {
+    const qr = qrcode(0, "M")
+    qr.addData(url)
+    qr.make()
+    const n = qr.getModuleCount()
+    const cell = Math.floor(size / n)
+    const ox = x + (size - cell * n) / 2
+    const oy = y + (size - cell * n) / 2
+    g.fillStyle = "#10201f"
+    for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+            if (qr.isDark(r, c)) g.fillRect(ox + c * cell, oy + r * cell, cell, cell)
+        }
+    }
+}
+
+// White tile with a soft shadow; the QR is drawn inside, leaving a quiet zone.
+function drawQrTile(g, x, y, size, drawInner) {
+    g.save()
+    g.shadowColor = "rgba(0,0,0,0.35)"
+    g.shadowBlur = 36
+    g.shadowOffsetY = 12
+    roundedRect(g, x, y, size, size, 30)
+    g.fillStyle = "#ffffff"
+    g.fill()
+    g.restore()
+    g.imageSmoothingQuality = "high"
+    drawInner(g, x + 28, y + 28, size - 56)
+}
+
+// Background, header (logo + small title) and page dots shared by all slides.
+function paintBase(g, kicker, i, n) {
+    const W = SCREEN.canvasW
+    const H = SCREEN.canvasH
+
+    const bg = g.createLinearGradient(0, 0, W, H)
+    bg.addColorStop(0, "#00322f")
+    bg.addColorStop(1, "#00706f")
+    g.fillStyle = bg
+    g.fillRect(0, 0, W, H)
+
+    const glow = g.createRadialGradient(W * 0.8, H * 0.35, 0, W * 0.8, H * 0.35, W * 0.5)
+    glow.addColorStop(0, "rgba(127,208,208,0.25)")
+    glow.addColorStop(1, "rgba(127,208,208,0)")
+    g.fillStyle = glow
+    g.fillRect(0, 0, W, H)
+
+    // faint scan lines, like a real screen
+    g.fillStyle = "rgba(255,255,255,0.025)"
+    for (let y = 0; y < H; y += 6) g.fillRect(0, y, W, 2)
+
+    // logo tile
+    roundedRect(g, SCREEN.leftX, 34, 84, 84, 18)
+    g.fillStyle = "#ffffff"
+    g.fill()
+    if (screenLogo.complete && screenLogo.naturalWidth) {
+        const box = 60
+        const r = Math.min(box / screenLogo.naturalWidth, box / screenLogo.naturalHeight)
+        const w = screenLogo.naturalWidth * r
+        const h = screenLogo.naturalHeight * r
+        g.drawImage(screenLogo, SCREEN.leftX + (84 - w) / 2, 34 + (84 - h) / 2, w, h)
+    }
+
+    // small title next to the logo
+    g.direction = "ltr"
+    g.textAlign = "left"
+    g.textBaseline = "alphabetic"
+    g.fillStyle = "#7fd0d0"
+    fitFont(g, kicker.toUpperCase(), 500, FONT_MONO, 760, 26, 16)
+    if ("letterSpacing" in g) g.letterSpacing = "3px"
+    g.fillText(kicker.toUpperCase(), SCREEN.leftX + 108, 34 + 52)
+    if ("letterSpacing" in g) g.letterSpacing = "0px"
+
+    // page dots
+    for (let k = 0; k < n; k++) {
+        g.beginPath()
+        g.arc(SCREEN.leftX + 10 + k * 30, H - 38, k === i ? 8 : 5, 0, Math.PI * 2)
+        g.fillStyle = k === i ? "#7fd0d0" : "rgba(255,255,255,0.35)"
+        g.fill()
+    }
+}
+
+// ---- the slides ----
+
+// Text on the left, QR code on the right.
+function paintQrSlide({ title, sub, text, url, qr }) {
+    return (g, i, n) => {
+        const H = SCREEN.canvasH
+        paintBase(g, "EAH Jena", i, n)
+        setTextDirection(g)
+        const x = zoneAnchor(SCREEN.leftX)
+
+        g.fillStyle = "#ffffff"
+        fitFont(g, title, 700, FONT_HEAD, SCREEN.zoneW, 96, 52)
+        let y = 250
+        g.fillText(title, x, y)
+
+        if (sub) {
+            g.fillStyle = "#7fd0d0"
+            g.font = `600 44px ${FONT_HEAD}`
+            y += 60
+            g.fillText(sub, x, y)
+        }
+
+        g.fillStyle = "rgba(255,255,255,0.88)"
+        g.font = `400 34px ${FONT_BODY}`
+        paintParagraph(g, text, x, y + 62, SCREEN.zoneW, 46)
+
+        if (url) {
+            g.fillStyle = "#7fd0d0"
+            fitFont(g, url, 500, FONT_MONO, SCREEN.zoneW, 26, 14)
+            g.fillText(url, x, H - 70)
+        }
+
+        const tile = 440
+        drawQrTile(g, SCREEN.rightX + (SCREEN.zoneW - tile) / 2, (H - tile) / 2 + 14, tile, qr)
+    }
+}
+
+function paintFactsSlide(g, i, n) {
+    paintBase(g, t('slideNumbersTitle'), i, n)
+    setTextDirection(g)
+    const number = (value, options) => new Intl.NumberFormat(currentLanguage || "de", options).format(value)
+
+    function stat(zoneStart, baseline, valueText, label, startPx) {
+        const x = zoneAnchor(zoneStart)
+        g.fillStyle = "#7fd0d0"
+        fitFont(g, valueText, 700, FONT_HEAD, SCREEN.zoneW, startPx, 60)
+        g.fillText(valueText, x, baseline)
+        g.fillStyle = "rgba(255,255,255,0.88)"
+        g.font = `500 36px ${FONT_BODY}`
+        g.fillText(label, x, baseline + 52)
+    }
+
+    stat(SCREEN.leftX, 290, number(1991, { useGrouping: false }), t('statFounded'), 130)
+    stat(SCREEN.leftX, 480, "~" + number(50), t('statPrograms'), 130)
+    stat(SCREEN.rightX, 380, "~" + number(4200), t('statStudents'), 150)
+}
+
+function paintAreasSlide(g, i, n) {
+    paintBase(g, t('slideAreasTitle'), i, n)
+    setTextDirection(g)
+
+    function pill(zoneStart, y, text) {
+        roundedRect(g, zoneStart, y, SCREEN.zoneW, 120, 24)
+        g.fillStyle = "rgba(255,255,255,0.12)"
+        g.fill()
+        // accent bar on the side where reading starts
+        roundedRect(g, isRtl() ? zoneStart + SCREEN.zoneW - 14 : zoneStart, y, 14, 120, 7)
+        g.fillStyle = "#7fd0d0"
+        g.fill()
+        g.fillStyle = "#ffffff"
+        fitFont(g, text, 700, FONT_HEAD, SCREEN.zoneW - 80, 50, 26)
+        g.fillText(text, isRtl() ? zoneStart + SCREEN.zoneW - 40 : zoneStart + 40, y + 76)
+    }
+
+    pill(SCREEN.leftX, 190, t('areaTech'))
+    pill(SCREEN.leftX, 340, t('areaBusiness'))
+    pill(SCREEN.rightX, 190, t('areaSocial'))
+    pill(SCREEN.rightX, 340, t('areaHealth'))
+}
+
+function paintApplySlide(g, i, n) {
+    paintBase(g, "EAH Jena", i, n)
+    setTextDirection(g)
+    const x = zoneAnchor(SCREEN.leftX)
+
+    g.fillStyle = "#ffffff"
+    g.font = `700 60px ${FONT_HEAD}`
+    let y = paintParagraph(g, t('slideApplyTitle'), x, 230, SCREEN.zoneW, 70)
+
+    g.fillStyle = "rgba(255,255,255,0.88)"
+    g.font = `400 31px ${FONT_BODY}`
+    paintParagraph(g, t('applyText'), x, y + 22, SCREEN.zoneW, 42)
+
+    // usual deadlines; the dates are formatted for the chosen language
+    const date = (month) => new Intl.DateTimeFormat(currentLanguage || "de", { day: "numeric", month: "long" })
+        .format(new Date(2000, month, 15))
+
+    function card(y0, dateText, label) {
+        roundedRect(g, SCREEN.rightX, y0, SCREEN.zoneW, 150, 26)
+        g.fillStyle = "rgba(255,255,255,0.12)"
+        g.fill()
+        const ax = isRtl() ? SCREEN.rightX + SCREEN.zoneW - 36 : SCREEN.rightX + 36
+        g.fillStyle = "#ffffff"
+        fitFont(g, dateText, 700, FONT_HEAD, SCREEN.zoneW - 72, 66, 36)
+        g.fillText(dateText, ax, y0 + 78)
+        g.fillStyle = "#7fd0d0"
+        g.font = `500 32px ${FONT_BODY}`
+        g.fillText(label, ax, y0 + 122)
+    }
+
+    card(150, date(6), t('applyWinter'))
+    card(320, date(1), t('applySummer'))
+
+    g.fillStyle = "rgba(255,255,255,0.7)"
+    g.font = `400 24px ${FONT_BODY}`
+    paintParagraph(g, t('applyNote'), zoneAnchor(SCREEN.rightX), 520, SCREEN.zoneW, 32)
+}
+
+function paintAskSlide(g, i, n) {
+    const H = SCREEN.canvasH
+    paintBase(g, "EAH Jena", i, n)
+    setTextDirection(g)
+    const x = zoneAnchor(SCREEN.leftX)
+
+    g.fillStyle = "#ffffff"
+    g.font = `700 70px ${FONT_HEAD}`
+    const y = paintParagraph(g, t('slideAskTitle'), x, 250, SCREEN.zoneW, 80)
+
+    g.fillStyle = "rgba(255,255,255,0.88)"
+    g.font = `400 34px ${FONT_BODY}`
+    paintParagraph(g, t('askText'), x, y + 24, SCREEN.zoneW, 46)
+
+    // a big question mark in a ring
+    const cx = SCREEN.rightX + SCREEN.zoneW / 2
+    const cy = H / 2 + 10
+    g.beginPath()
+    g.arc(cx, cy, 170, 0, Math.PI * 2)
+    g.fillStyle = "rgba(255,255,255,0.1)"
+    g.fill()
+    g.lineWidth = 8
+    g.strokeStyle = "#7fd0d0"
+    g.stroke()
+    g.fillStyle = "#ffffff"
+    g.font = `700 230px ${FONT_HEAD}`
+    g.textAlign = "center"
+    g.textBaseline = "middle"
+    g.direction = "ltr"
+    g.fillText("?", cx, cy + 12)
+}
+
+// ---- building and showing ----
+
+function rebuildScreenSlides() {
+    const s = screenState
+    if (!s.active) return
+
+    const painters = []
+    const shortUrl = (u) => u.replace(/^https?:\/\//, "").replace(/\/$/, "")
+
+    if (SITE_QR.url) {
+        painters.push(paintQrSlide({
+            title: SITE_QR.title,
+            sub: t('siteLabel'),
+            text: t('siteText'),
+            url: shortUrl(SITE_QR.url),
+            qr: (g, x, y, size) => drawQrMatrix(g, SITE_QR.url, x, y, size)
+        }))
+    }
+    if (APP_QR.image && screenAppQrReady) {
+        painters.push(paintQrSlide({
+            title: APP_QR.title,
+            sub: "",
+            text: t('appText'),
+            url: APP_QR.url ? shortUrl(APP_QR.url) : "",
+            qr: (g, x, y, size) => g.drawImage(screenAppQr, x, y, size, size)
+        }))
+    }
+    painters.push(paintFactsSlide, paintAreasSlide, paintApplySlide, paintAskSlide)
+
+    s.slides = painters.map((paint, i) => {
+        const canvas = document.createElement("canvas")
+        canvas.width = SCREEN.canvasW
+        canvas.height = SCREEN.canvasH
+        paint(canvas.getContext("2d"), i, painters.length)
+        return canvas
+    })
+    if (s.index >= s.slides.length) s.index = 0
+    s.fade = null
+    composeScreen(null)
+}
+
+function easeInOut(p) {
+    return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2
+}
+
+// Puts the current slide (or a cross-fade between two) on the visible canvas.
+function composeScreen(fade) {
+    const s = screenState
+    if (!s.ctx || !s.slides.length) return
+    s.ctx.globalAlpha = 1
+    if (!fade) {
+        s.ctx.drawImage(s.slides[s.index], 0, 0)
+    } else {
+        const p = easeInOut(fade.progress)
+        s.ctx.drawImage(s.slides[fade.from], 0, 0)
+        s.ctx.globalAlpha = p
+        s.ctx.drawImage(s.slides[fade.to], (1 - p) * 60, 0) // slides in slightly from the side while fading in
+        s.ctx.globalAlpha = 1
+    }
+    s.texture.needsUpdate = true
+}
+
+function addScreen() {
+    const canvas = document.createElement("canvas")
+    canvas.width = SCREEN.canvasW
+    canvas.height = SCREEN.canvasH
+    const ctx = canvas.getContext("2d")
+    ctx.fillStyle = "#00302f"
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.anisotropy = 4
+
+    const z = ROOM.back
+    const glow = new THREE.Mesh(
+        new THREE.PlaneGeometry(SCREEN.w + 1.0, SCREEN.h + 1.0),
+        new THREE.MeshBasicMaterial({
+            map: createSoftDotTexture(),
+            color: 0x7fd0d0,
+            transparent: true,
+            opacity: 0.35,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        })
+    )
+    glow.position.set(0, SCREEN.y, z + 0.004)
+
+    const bezel = new THREE.Mesh(
+        new THREE.PlaneGeometry(SCREEN.w + 0.14, SCREEN.h + 0.14),
+        new THREE.MeshBasicMaterial({ color: 0x06191a })
+    )
+    bezel.position.set(0, SCREEN.y, z + 0.01)
+
+    const face = new THREE.Mesh(
+        new THREE.PlaneGeometry(SCREEN.w, SCREEN.h),
+        new THREE.MeshBasicMaterial({ map: texture, toneMapped: false })
+    )
+    face.position.set(0, SCREEN.y, z + 0.02)
+
+    const group = new THREE.Group()
+    group.add(glow, bezel, face)
+    group.visible = false // appears once a language is chosen
+    scene.add(group)
+
+    screenState.group = group
+    screenState.ctx = ctx
+    screenState.texture = texture
+}
+
+addScreen()
+
+function startScreen() {
+    if (screenState.active) return
+    screenState.active = true
+    screenState.shownAt = clock.getElapsedTime()
+    screenState.group.visible = true
+    rebuildScreenSlides()
+
+    // Web fonts load asynchronously; repaint once they are ready so the text uses them.
+    if (document.fonts && document.fonts.load) {
+        Promise.all([
+            document.fonts.load('700 40px "Space Grotesk"'),
+            document.fonts.load('400 24px "Inter"'),
+            document.fonts.load('500 20px "JetBrains Mono"')
+        ]).then(() => rebuildScreenSlides()).catch(() => {})
+    }
+}
+
+// Small or portrait windows get link chips instead (the screen would be too small to read).
+const compactQuery = window.matchMedia("(max-width: 900px), (max-aspect-ratio: 6/5)")
+let screenWanted = false
+
+function requestScreen() {
+    screenWanted = true
+    if (!compactQuery.matches) startScreen()
+}
+compactQuery.addEventListener("change", () => {
+    if (screenWanted && !compactQuery.matches) startScreen()
+})
+
+function updateScreen(elapsed) {
+    const s = screenState
+    if (!s.active || s.slides.length < 2) return
+
+    if (s.fade) {
+        const p = (elapsed - s.fade.start) / SCREEN.fadeSeconds
+        if (p >= 1) {
+            s.index = s.fade.to
+            s.fade = null
+            s.shownAt = elapsed
+            composeScreen(null)
+        } else {
+            s.fade.progress = Math.max(0, p)
+            composeScreen(s.fade)
+        }
+        return
+    }
+
+    if (elapsed - s.shownAt >= SCREEN.slideSeconds) {
+        const to = (s.index + 1) % s.slides.length
+        if (REDUCED_MOTION) {
+            s.index = to
+            s.shownAt = elapsed
+            composeScreen(null)
+        } else {
+            s.fade = { from: s.index, to, start: elapsed, progress: 0 }
+        }
+    }
+}
+
+
 // Soft floating light dots behind and around the avatar.
 function createSoftDotTexture() {
     const c = document.createElement("canvas")
@@ -975,107 +1738,25 @@ function buildVignette() {
     document.body.appendChild(v)
 }
 
-// QR code as an inline SVG, drawn from the module matrix (no HTML strings).
-function buildQrSvg(url) {
-    const qr = qrcode(0, "M")
-    qr.addData(url)
-    qr.make()
-    const n = qr.getModuleCount()
-    const margin = 2
-    let d = ""
-    for (let r = 0; r < n; r++) {
-        for (let c = 0; c < n; c++) {
-            if (qr.isDark(r, c)) d += `M${c + margin} ${r + margin}h1v1h-1z`
-        }
-    }
-    const NS = "http://www.w3.org/2000/svg"
-    const svg = document.createElementNS(NS, "svg")
-    svg.setAttribute("viewBox", `0 0 ${n + margin * 2} ${n + margin * 2}`)
-    svg.setAttribute("shape-rendering", "crispEdges")
-    svg.setAttribute("role", "img")
-    svg.setAttribute("aria-label", "QR code")
-    const bg = document.createElementNS(NS, "rect")
-    bg.setAttribute("width", "100%")
-    bg.setAttribute("height", "100%")
-    bg.setAttribute("fill", "#ffffff")
-    const path = document.createElementNS(NS, "path")
-    path.setAttribute("d", d)
-    path.setAttribute("fill", "#10201f")
-    svg.appendChild(bg)
-    svg.appendChild(path)
-    return svg
-}
-
-// One card with a title, a QR code (any DOM node), a short text and, if
-// there is a link, the address. Cards with a link are clickable.
-function buildQrCard({ id, title, qrNode, text, url }) {
-    const card = document.createElement(url ? "a" : "div")
-    card.id = id
-    card.className = "qr-card" + (url ? "" : " no-link")
-    if (url) {
-        card.href = url
-        card.target = "_blank"
-        card.rel = "noopener noreferrer"
-    } else {
-        card.setAttribute("role", "group")
-    }
-    card.setAttribute("aria-label", `${title}: ${text}`)
-
-    const titleEl = document.createElement("div")
-    titleEl.className = "qr-card-title"
-    titleEl.textContent = title
-
-    const qrBox = document.createElement("div")
-    qrBox.className = "qr-card-qr"
-    qrBox.appendChild(qrNode)
-
-    const textEl = document.createElement("div")
-    textEl.className = "qr-card-text"
-    textEl.textContent = text
-
-    card.appendChild(titleEl)
-    card.appendChild(qrBox)
-    card.appendChild(textEl)
-
-    if (url) {
-        const urlEl = document.createElement("div")
-        urlEl.className = "qr-card-url"
-        urlEl.textContent = url.replace(/^https?:\/\//, "").replace(/\/$/, "")
-        card.appendChild(urlEl)
-    }
-    return card
-}
-
-// The Ernst App card (picture) on top, the website card (generated) below.
-// On small screens both shrink to compact link chips (see the CSS).
-function buildQrPanels() {
+// Compact link chips for small or portrait screens, where the big screen on
+// the wall is too small to read. The CSS shows them only there. The Ernst
+// App chip needs a link (APP_QR.url) because it is only a picture otherwise.
+function buildQrChips() {
     const panel = document.createElement("div")
     panel.id = "qr-panels"
 
-    if (APP_QR.image) {
-        const img = document.createElement("img")
-        img.src = APP_QR.image
-        img.alt = `QR code: ${APP_QR.title}`
-        const card = buildQrCard({
-            id: "qr-app",
-            title: APP_QR.title,
-            qrNode: img,
-            text: t('appText'),
-            url: APP_QR.url
-        })
-        img.addEventListener("error", () => card.remove()) // picture missing: no card
-        panel.appendChild(card)
+    function chip(title, url) {
+        const link = document.createElement("a")
+        link.className = "qr-chip"
+        link.href = url
+        link.target = "_blank"
+        link.rel = "noopener noreferrer"
+        link.textContent = title
+        return link
     }
 
-    if (SITE_QR.url) {
-        panel.appendChild(buildQrCard({
-            id: "qr-site",
-            title: `${SITE_QR.title} · ${t('siteLabel')}`,
-            qrNode: buildQrSvg(SITE_QR.url),
-            text: t('siteText'),
-            url: SITE_QR.url
-        }))
-    }
+    if (APP_QR.url) panel.appendChild(chip(APP_QR.title, APP_QR.url))
+    if (SITE_QR.url) panel.appendChild(chip(`${SITE_QR.title} · ${t('siteLabel')}`, SITE_QR.url))
 
     if (panel.children.length) document.body.appendChild(panel)
 }
@@ -1420,7 +2101,8 @@ buildCharacterSelectUI((character, language) => {
 
     buildLoadingOverlay()
     buildChatUI()
-    buildQrPanels()
+    buildQrChips()
+    requestScreen()
     loadAvatar(character)
     startIdleWatch()
 })
@@ -1735,75 +2417,148 @@ function driveLipSyncFromAlignment(audio, alignment) {
     return () => cancelAnimationFrame(frameId)
 }
 
-function speakWithElevenLabs(text) {
-    return fetch(TTS_ENDPOINT, {
+// ---- One voice at a time ----
+//
+// Every call to speak() or stopSpeaking() starts a new "turn" (speechToken).
+// Whatever is still running from an older turn — a pending voice request,
+// audio that is playing, the browser voice, the lip-sync — is stopped, and
+// late callbacks of an older turn check the token and do nothing. That is
+// what prevents two voices from overlapping.
+
+let speechToken = 0
+let currentAudio = null
+let currentStopDriving = null
+let ttsAbort = null
+
+// "busy" (on <body>) shows the stop button while she waits for an answer or talks.
+function setBusy(on) {
+    document.body.classList.toggle("busy", on)
+}
+
+function stopSpeaking() {
+    speechToken++
+    if (ttsAbort) { ttsAbort.abort(); ttsAbort = null }
+    if (currentAudio) { currentAudio.pause(); currentAudio = null }
+    if (currentStopDriving) { currentStopDriving(); currentStopDriving = null }
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel()
+    stopLipSync()
+    setSubtitle("")
+}
+
+// Pending chat request, so a newer question (or stop) can cancel it.
+let chatAbort = null
+let questionId = 0
+
+function cancelPendingQuestion() {
+    questionId++
+    if (chatAbort) { chatAbort.abort(); chatAbort = null }
+}
+
+// The stop button and the Esc key: silence her right now and drop any
+// answer that has not arrived yet.
+function stopEverything() {
+    cancelPendingQuestion()
+    stopSpeaking()
+    setBusy(false)
+}
+
+async function speakWithElevenLabs(text, token) {
+    ttsAbort = new AbortController()
+    const res = await fetch(TTS_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             text,
             voice: currentAvatarVoice,
             language: currentLanguage
-        })
+        }),
+        signal: ttsAbort.signal
     })
-        .then(res => {
-            if (!res.ok) throw new Error("TTS backend returned " + res.status)
-            return res.json()
+    if (!res.ok) throw new Error("TTS backend returned " + res.status)
+    const { audio_base64, alignment } = await res.json()
+
+    // A newer turn took over while we were waiting for the audio.
+    if (token !== speechToken) return
+
+    const audio = new Audio(`data:audio/mpeg;base64,${audio_base64}`)
+    currentAudio = audio
+
+    return new Promise((resolve, reject) => {
+        let stopDriving = null
+        let finished = false
+
+        // Runs when the audio ended or was paused (stopSpeaking() pauses it).
+        const finish = () => {
+            if (finished) return
+            finished = true
+            if (stopDriving) stopDriving()
+            if (token === speechToken) {
+                currentAudio = null
+                currentStopDriving = null
+                stopLipSync()
+                setSubtitle("")
+                setBusy(false)
+            }
+            resolve()
+        }
+
+        audio.addEventListener("play", () => {
+            if (token !== speechToken) return
+            startLipSync()
+            stopDriving = driveLipSyncFromAlignment(audio, alignment)
+            currentStopDriving = stopDriving
         })
-        .then(({ audio_base64, alignment }) => {
-            const audio = new Audio(`data:audio/mpeg;base64,${audio_base64}`)
-
-            return new Promise((resolve, reject) => {
-                let stopDriving = null
-
-                audio.addEventListener("play", () => {
-                    startLipSync()
-                    stopDriving = driveLipSyncFromAlignment(audio, alignment)
-                })
-                audio.addEventListener("ended", () => {
-                    if (stopDriving) stopDriving()
-                    stopLipSync()
-                    setSubtitle("")
-                    resolve()
-                })
-                audio.addEventListener("error", (e) => {
-                    if (stopDriving) stopDriving()
-                    stopLipSync()
-                    reject(e)
-                })
-
-                audio.play().catch(reject)
-            })
+        audio.addEventListener("ended", finish)
+        audio.addEventListener("pause", finish)
+        audio.addEventListener("error", (e) => {
+            if (finished) return
+            finished = true
+            if (stopDriving) stopDriving()
+            if (token === speechToken) {
+                currentAudio = null
+                stopLipSync()
+            }
+            reject(e)
         })
+
+        audio.play().catch(reject)
+    })
 }
 
-function speakWithBrowserTTS(text) {
+function speakWithBrowserTTS(text, token) {
     const speech = new SpeechSynthesisUtterance(text)
     speech.lang = t('speechLang')
 
     const voice = pickVoice()
     if (voice) speech.voice = voice
 
-    speech.onstart = () => startLipSync()
-    speech.onend = () => {
+    const done = () => {
+        if (token !== speechToken) return // an older voice ending must not touch the new one
         stopLipSync()
         setSubtitle("")
+        setBusy(false)
     }
-    speech.onerror = () => {
-        stopLipSync()
-        setSubtitle("")
-    }
+
+    speech.onstart = () => { if (token === speechToken) startLipSync() }
+    speech.onend = done
+    speech.onerror = done
 
     window.speechSynthesis.speak(speech)
 }
 
 async function speak(text) {
+    stopSpeaking() // never two voices at once
+    const token = ++speechToken
+    setBusy(true)
     setSubtitle(text)
 
     try {
-        await speakWithElevenLabs(text)
+        await speakWithElevenLabs(text, token)
     } catch (err) {
+        // Stopped on purpose (new question, stop button): stay silent.
+        if (token !== speechToken || err.name === "AbortError") return
         console.warn("ElevenLabs TTS unavailable, falling back to browser speech synthesis:", err)
-        speakWithBrowserTTS(text)
+        speakWithBrowserTTS(text, token)
     }
 }
 
@@ -1949,6 +2704,20 @@ function buildChatUI() {
     micBtn.textContent = "🎤"
     micBtn.title = t('micTitle')
 
+    // Stops her immediately (also on the Esc key); only visible while she
+    // is thinking or talking.
+    const stopBtn = document.createElement("button")
+    stopBtn.id = "stop-btn"
+    stopBtn.className = "chat-btn"
+    stopBtn.type = "button"
+    stopBtn.textContent = "■"
+    stopBtn.title = `${t('stopTitle')} (Esc)`
+    stopBtn.setAttribute("aria-label", t('stopTitle'))
+    stopBtn.addEventListener("click", stopEverything)
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") stopEverything()
+    })
+
     const sendBtn = document.createElement("button")
     sendBtn.id = "send-btn"
     sendBtn.className = "chat-btn"
@@ -1956,6 +2725,7 @@ function buildChatUI() {
 
     row.appendChild(input)
     row.appendChild(micBtn)
+    row.appendChild(stopBtn)
     row.appendChild(sendBtn)
 
     // Tappable example questions, shown until the first question is asked.
@@ -1978,14 +2748,26 @@ function buildChatUI() {
     container.appendChild(row)
     document.body.appendChild(container)
 
+    // A new question always interrupts the current one: her voice stops at
+    // once, an answer that is still on its way is dropped, and only the
+    // newest question gets answered.
     async function handleQuestion(text) {
         if (!text || !text.trim()) return
+        cancelPendingQuestion()
+        stopSpeaking()
+        const thisQuestion = questionId
+        chatAbort = new AbortController()
+        const signal = chatAbort.signal
+
         suggestionsEl.classList.add("hidden")
         markActivity()
         input.value = ""
         showUserBubble(text)
+        setBusy(true)
         setSubtitle(t('thinking'), true)
-        const answer = await getAnswer(text)
+
+        const answer = await getAnswer(text, signal)
+        if (answer === null || thisQuestion !== questionId) return // replaced or stopped
         speak(answer)
     }
 
@@ -2001,6 +2783,7 @@ function buildChatUI() {
         recognition.interimResults = false
 
         micBtn.addEventListener("click", () => {
+            stopEverything() // so the microphone does not pick up her own voice
             micBtn.classList.add("listening")
             micBtn.textContent = "●"
             recognition.start()
@@ -2080,6 +2863,7 @@ function animate() {
     const elapsed = clock.getElapsedTime()
 
     updateAtmosphere(delta, elapsed)
+    updateScreen(elapsed)
 
     if (currentAvatarRoot) {
         applyIdleSway(elapsed)
