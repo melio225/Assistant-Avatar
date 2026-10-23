@@ -92,13 +92,13 @@ const IDLE_WARNING_S = 20             // the warning is shown for the last N sec
 //             browser from the URL. Set the url to "" to hide it.
 const APP_QR = {
     title: "Ernst App",
-    image: "/images/ernst-app-qr.png",
-    url: "https://open.uninow.com/GeBKl" // the link encoded in the QR picture
-}
+    url: "https://www.eah-jena.de/hochschule/organisation-und-services/ernstapp"
+};
+
 const SITE_QR = {
     title: "EAH Jena",
     url: "https://www.eah-jena.de"
-}
+};
 
 // Visual tuning — all motion and atmosphere values live here.
 const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -846,7 +846,6 @@ function findAnswer(question) {
 // frontend and backend share a domain — requests then go to /api/... on
 // the same origin, so no CORS is involved.
 
-// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001"
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001"
 const CHAT_ENDPOINT = `${API_BASE_URL}/api/chat`
 const TTS_ENDPOINT = `${API_BASE_URL}/api/tts`
@@ -1138,15 +1137,15 @@ const screenLogo = new Image()
 screenLogo.addEventListener("load", () => rebuildScreenSlides())
 screenLogo.src = eahLogoUrl
 
-const screenAppQr = new Image()
-let screenAppQrReady = false
-if (APP_QR.image) {
-    screenAppQr.addEventListener("load", () => {
-        screenAppQrReady = true
-        rebuildScreenSlides()
-    })
-    screenAppQr.src = APP_QR.image // if the file is missing the slide is simply skipped
-}
+// const screenAppQr = new Image()
+// let screenAppQrReady = false
+// if (APP_QR.image) {
+//     screenAppQr.addEventListener("load", () => {
+//         screenAppQrReady = true
+//         rebuildScreenSlides()
+//     })
+//     screenAppQr.src = APP_QR.image // if the file is missing the slide is simply skipped
+// }
 
 function isRtl() {
     const lang = LANGUAGES.find(l => l.code === currentLanguage)
@@ -1463,13 +1462,13 @@ function rebuildScreenSlides() {
             qr: (g, x, y, size) => drawQrMatrix(g, SITE_QR.url, x, y, size)
         }))
     }
-    if (APP_QR.image && screenAppQrReady) {
+    if (APP_QR.url) {
         painters.push(paintQrSlide({
             title: APP_QR.title,
             sub: "",
             text: t('appText'),
-            url: APP_QR.url ? shortUrl(APP_QR.url) : "",
-            qr: (g, x, y, size) => g.drawImage(screenAppQr, x, y, size, size)
+            url: shortUrl(APP_QR.url),
+            qr: (g, x, y, size) => drawQrMatrix(g, APP_QR.url, x, y, size)
         }))
     }
     painters.push(paintFactsSlide, paintAreasSlide, paintApplySlide, paintAskSlide)
