@@ -82,23 +82,19 @@ const IDLE_WARNING_S = 20             // the warning is shown for the last N sec
 
 // QR codes. They are shown on the big screen on the wall behind the avatar
 // (rotating slides) and, on small or portrait screens, as link chips.
-//  - APP_QR:  the Ernst App. The QR code is a PICTURE you provide
-//             (public/images/ernst-app-qr.png); it is shown as it is and
-//             nothing is generated. Replace the file to change it. "url" is
-//             optional and used for the link chip on phones; if it is empty
-//             that chip is hidden. If the picture is missing, its slide is
-//             skipped.
-//  - SITE_QR: the official website. This QR code is generated in the
-//             browser from the URL. Set the url to "" to hide it.
+// Both QR codes are generated in the browser from their link, so changing a
+// link here is all it takes. Set a url to "" to hide that QR code (its slide
+// and its chip).
+//  - APP_QR:  the Ernst App.
+//  - SITE_QR: the official website.
 const APP_QR = {
     title: "Ernst App",
     url: "https://www.eah-jena.de/hochschule/organisation-und-services/ernstapp"
-};
-
+}
 const SITE_QR = {
     title: "EAH Jena",
     url: "https://www.eah-jena.de"
-};
+}
 
 // Visual tuning — all motion and atmosphere values live here.
 const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -846,6 +842,7 @@ function findAnswer(question) {
 // frontend and backend share a domain — requests then go to /api/... on
 // the same origin, so no CORS is involved.
 
+// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001"
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001"
 const CHAT_ENDPOINT = `${API_BASE_URL}/api/chat`
 const TTS_ENDPOINT = `${API_BASE_URL}/api/tts`
@@ -1132,20 +1129,10 @@ const screenState = {
     active: false
 }
 
-// Pictures used on the screen: the university logo and the Ernst App QR picture.
+// The university logo drawn in the header of every slide.
 const screenLogo = new Image()
 screenLogo.addEventListener("load", () => rebuildScreenSlides())
 screenLogo.src = eahLogoUrl
-
-// const screenAppQr = new Image()
-// let screenAppQrReady = false
-// if (APP_QR.image) {
-//     screenAppQr.addEventListener("load", () => {
-//         screenAppQrReady = true
-//         rebuildScreenSlides()
-//     })
-//     screenAppQr.src = APP_QR.image // if the file is missing the slide is simply skipped
-// }
 
 function isRtl() {
     const lang = LANGUAGES.find(l => l.code === currentLanguage)
@@ -1739,7 +1726,7 @@ function buildVignette() {
 
 // Compact link chips for small or portrait screens, where the big screen on
 // the wall is too small to read. The CSS shows them only there. The Ernst
-// App chip needs a link (APP_QR.url) because it is only a picture otherwise.
+// App chip is hidden if APP_QR.url is empty.
 function buildQrChips() {
     const panel = document.createElement("div")
     panel.id = "qr-panels"

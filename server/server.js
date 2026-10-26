@@ -13,11 +13,11 @@ dotenv.config()
 // ======================
 //
 // Default: Mistral (needs MISTRAL_API_KEY).
-// To use any OpenAI-compatible provider instead (Google Gemini, Groq, ...),
+// To use any OpenAI-compatible provider instead (for example Groq),
 // set all three of these in .env — no code change needed:
-//   LLM_BASE_URL  e.g. https://generativelanguage.googleapis.com/v1beta/openai
+//   LLM_BASE_URL  e.g. https://api.groq.com/openai/v1
 //   LLM_API_KEY   the provider's API key
-//   LLM_MODEL     e.g. gemini-2.5-flash
+//   LLM_MODEL     e.g. llama-3.3-70b-versatile
 // Remove LLM_BASE_URL to go back to Mistral.
 
 const LLM_BASE_URL = process.env.LLM_BASE_URL
