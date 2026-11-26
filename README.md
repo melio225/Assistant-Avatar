@@ -113,10 +113,6 @@ pm2 restart avatar-backend --update-env
 
 Apache needs `DocumentRoot /var/www/avatar` and `ProxyPass /api http://127.0.0.1:3001/api` in its HTTPS virtual host (modules: `proxy`, `proxy_http`, `headers`, `ssl`). Details are in the project documentation.
 
-## Documentation
-
-The full documentation (in German) describes the architecture, every feature, operation and troubleshooting. It is kept next to the code in this repository.
-
 ## Security
 
 - Keys, passwords and account data are **not** part of this repository.
